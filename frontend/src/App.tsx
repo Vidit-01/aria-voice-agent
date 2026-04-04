@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth";
+import ChatBot from "@/components/ChatBot.jsx";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import Index from "./pages/Index.tsx";
@@ -60,6 +61,7 @@ const App = () => (
             {/* ── Fallback ── */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <ChatBot />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
