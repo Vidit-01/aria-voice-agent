@@ -3,34 +3,36 @@ import FloatingCard from "./FloatingCard";
 import AbstractBackdrop from "./AbstractBackdrop";
 
 const cards = [
-  { city: "Cambridge", image: "/landing/cambridge.png", gradient: "linear-gradient(135deg, #34d399 0%, #10b981 100%)", rotation: -12, floatClass: "animate-float-1" },
-  { city: "London", image: "/landing/london.png", gradient: "linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)", rotation: -6, floatClass: "animate-float-2" },
   { city: "Oxford", image: "/landing/oxford.png", gradient: "linear-gradient(135deg, #fb923c 0%, #ea580c 100%)", rotation: 0, floatClass: "animate-float-3" },
-  { city: "Dubai", image: "/landing/dubai.png", gradient: "linear-gradient(135deg, #c084fc 0%, #9333ea 100%)", rotation: 6, floatClass: "animate-float-4" },
+  { city: "London", image: "/landing/london.png", gradient: "linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)", rotation: -6, floatClass: "animate-float-2" },
+  { city: "Cambridge", image: "/landing/cambridge.png", gradient: "linear-gradient(135deg, #34d399 0%, #10b981 100%)", rotation: -12, floatClass: "animate-float-1" },
   { city: "Dublin", image: "/landing/dublin.png", gradient: "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)", rotation: 12, floatClass: "animate-float-5" },
+  { city: "Dubai", image: "/landing/dubai.png", gradient: "linear-gradient(135deg, #c084fc 0%, #9333ea 100%)", rotation: 6, floatClass: "animate-float-4" },
 ];
 
 const HeroSection = () => {
   return (
-    <section className="relative flex h-screen max-h-screen w-full flex-col items-center justify-end overflow-hidden md:justify-center">
-      {/* Sky background */}
-      <video
-        ref={(el) => {
-          if (el) {
-            el.playbackRate = 0.7;
-          }
-        }}
-        className="absolute inset-0 h-full w-full object-cover z-0"
-        autoPlay
-        muted
-        loop
-        playsInline
-      >
-        <source src="/landing/sky.mp4" type="video/mp4"  />
-      </video>
-      <AbstractBackdrop className="z-10 opacity-80" />
-      {/* Slight animated overlay for life */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/60 z-20" />
+    <section className="relative flex h-screen max-h-screen w-full flex-col items-center justify-end md:justify-center overflow-x-hidden overflow-y-visible">
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        {/* Sky background */}
+        <video
+          ref={(el) => {
+            if (el) {
+              el.playbackRate = 0.7;
+            }
+          }}
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+        >
+          <source src="/landing/sky.mp4" type="video/mp4"  />
+        </video>
+        <AbstractBackdrop className="opacity-80" />
+        {/* Slight animated overlay for life */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/60" />
+      </div>
 
       {/* Heading */}
       <motion.div
@@ -62,7 +64,7 @@ const HeroSection = () => {
       </motion.div>
 
       {/* Floating Cards - curved arc layout */}
-      <div className="relative z-40 mb-0 md:mb-10 mt-auto flex items-end justify-center gap-6 md:gap-10 px-4 w-full">
+      <div className="relative z-40 mb-0 md:mb-10 mt-auto flex items-end justify-center gap-6 md:gap-11 px-4 w-full overflow-visible">
         {cards.map((card, i) => {
           // Arc positioning: center card lower, sides higher
           const centerIndex = 2;
