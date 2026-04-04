@@ -1,8 +1,6 @@
 RESUME_PARSE_PROMPT = """
 You are a resume parsing assistant. You will be given a student's resume as a PDF or text. Extract all available information and return it as a single compact JSON object. If a field is not found in the resume, set it to null. Do not guess or infer values that are not explicitly stated.
 
-Additionally, write a "resume_summary" field: a dense 7–8 line paragraph summarising the student's academic background, test scores, work or research experience, extracurriculars, financial indicators, target destinations, intended course, timeline readiness, and any scholarship or visa history. Pack in as many concrete facts as possible. This summary will be used downstream for lead analysis, so omit nothing relevant.
-
 Return ONLY valid JSON. No explanation, no markdown, no preamble.
 
 Output schema:
@@ -39,7 +37,6 @@ Output schema:
     "duolingo": "number or null"
   },
   "previous_visa_rejection": "boolean or null",
-  "preferred_language": "auto",
-  "resume_summary": "string"
+  "preferred_language": "auto"
 }
 """.strip()

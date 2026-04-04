@@ -218,10 +218,24 @@ export async function updateProfile(
   });
 }
 
+export interface ProfileScorePayload {
+  total_score: number;
+  breakdown: Record<string, number>;
+  missing_fields: string[];
+  recommendations: string[];
+}
+
+export interface ResumeUploadResult {
+  message: string;
+  resume_url?: string;
+  parsed_profile?: Record<string, unknown>;
+  profile_score?: ProfileScorePayload;
+}
+
 export async function uploadResume(
   userId: string,
   file: File
-): Promise<{ message: string; resume_url?: string }> {
+): Promise<ResumeUploadResult> {
   const form = new FormData();
   form.append("file", file);
   return apiFetch(`/profile/${userId}/resume`, { method: "POST", body: form }, true);

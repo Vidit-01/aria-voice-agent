@@ -9,19 +9,42 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
-const classBadge = (c: string) => {
-  if (c === "hot") return "bg-red-100 text-red-700";
-  if (c === "warm") return "bg-amber-100 text-amber-700";
-  return "bg-slate-100 text-slate-600";
-};
+// @ts-expect-error — JSX components without type declarations
+import AnalyticsBar from "@/components/admin/AnalyticsBar";
+// @ts-expect-error — JSX components without type declarations
+import LeadsTable from "@/components/admin/LeadsTable";
+// @ts-expect-error — JSX components without type declarations
+import LeadDetailPanel from "@/components/admin/LeadDetailPanel";
 
-const StatCard = ({ label, value, sub }: { label: string; value: string | number; sub?: string }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-    <p className="mt-2 text-3xl font-extrabold text-slate-900">{value}</p>
-    {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
-  </div>
-);
+const LIMIT = 20;
+
+const CLASS_ORDER: Record<string, number> = { hot: 0, warm: 1, cold: 2 };
+
+function sortLeads(leads: LeadSummary[], sortBy: string): LeadSummary[] {
+  if (sortBy === "newest") {
+    return [...leads].sort((a, b) => {
+      const ta = a.last_session_at ? new Date(a.last_session_at).getTime() : 0;
+      const tb = b.last_session_at ? new Date(b.last_session_at).getTime() : 0;
+      return tb - ta;
+    });
+  }
+  if (sortBy === "score") {
+    return [...leads].sort(
+      (a, b) => (b.latest_lead_score ?? 0) - (a.latest_lead_score ?? 0)
+    );
+  }
+  // Default — urgency: classification priority → lead_score desc → last_session_at desc
+  return [...leads].sort((a, b) => {
+    const ca = CLASS_ORDER[a.latest_classification?.toLowerCase() ?? ""] ?? 2;
+    const cb = CLASS_ORDER[b.latest_classification?.toLowerCase() ?? ""] ?? 2;
+    if (ca !== cb) return ca - cb;
+    const sd = (b.latest_lead_score ?? 0) - (a.latest_lead_score ?? 0);
+    if (sd !== 0) return sd;
+    const ta = a.last_session_at ? new Date(a.last_session_at).getTime() : 0;
+    const tb = b.last_session_at ? new Date(b.last_session_at).getTime() : 0;
+    return tb - ta;
+  });
+}
 
 const AdminDashboard = () => {
   useDocumentTitle("Admin Dashboard");
@@ -33,11 +56,10 @@ const AdminDashboard = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [classification, setClassification] = useState("");
-  const [sortBy, setSortBy] = useState("created_at");
+  const [sortBy, setSortBy] = useState("urgency");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const LIMIT = 20;
+  const [selectedLead, setSelectedLead] = useState<LeadSummary | null>(null);
 
   useEffect(() => {
     adminGetAnalytics()
@@ -47,12 +69,21 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     setLoading(true);
-    adminGetLeads({ page, limit: LIMIT, classification: classification || undefined, sort_by: sortBy })
-      .then((r) => {
-        setLeads(r.leads);
+    // Map UI sort to API sort param
+    const apiSort = sortBy === "score" ? "lead_score" : "created_at";
+    adminGetLeads({
+      page,
+      limit: LIMIT,
+      classification: classification || undefined,
+      sort_by: apiSort,
+    })
+      .then((r: { leads: LeadSummary[]; total: number }) => {
+        setLeads(sortLeads(r.leads, sortBy));
         setTotal(r.total);
       })
-      .catch((err: { detail?: string }) => setError(err?.detail ?? "Failed to load leads."))
+      .catch((err: { detail?: string }) =>
+        setError(err?.detail ?? "Failed to load leads.")
+      )
       .finally(() => setLoading(false));
   }, [page, classification, sortBy]);
 
@@ -64,229 +95,136 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7fbff]">
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-3">
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#fafafa",
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      }}
+    >
+      {/* ── Header ── */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          background: "#fff",
+          borderBottom: "1px solid #e5e7eb",
+          padding: "0 24px",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1400,
+            margin: "0 auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            height: 50,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Link to="/">
-              <img src="/landing/fateh_logo.png" alt="Fateh" className="h-8 w-auto" />
+              <img
+                src="/landing/fateh_logo.png"
+                alt="Fateh"
+                style={{ height: 26 }}
+              />
             </Link>
-            <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">
-              Admin
+            <span
+              style={{
+                background: "#1e293b",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 4,
+                letterSpacing: "0.04em",
+              }}
+            >
+              ADMIN
+            </span>
+            <span
+              style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}
+            >
+              Dashboard
             </span>
           </div>
           <button
             onClick={handleLogout}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            style={{
+              padding: "5px 14px",
+              border: "1px solid #e5e7eb",
+              borderRadius: 6,
+              fontSize: 13,
+              cursor: "pointer",
+              background: "#fff",
+              color: "#374151",
+            }}
           >
             Log out
           </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-10">
-        <h1 className="text-2xl font-extrabold text-slate-900">Overview</h1>
-
+      {/* ── Main ── */}
+      <main
+        style={{
+          maxWidth: 1400,
+          margin: "0 auto",
+          padding: "24px",
+        }}
+      >
         {error && (
-          <div className="my-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 16 }}>
+            {error}
+          </p>
         )}
 
-        {/* Analytics cards */}
-        {analytics && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Total leads" value={analytics.total_leads} />
-            <StatCard
-              label="Avg lead score"
-              value={analytics.average_lead_score.toFixed(1)}
-              sub="out of 100"
-            />
-            <StatCard
-              label="Sessions today"
-              value={analytics.sessions_today}
-              sub={`${analytics.total_sessions} total`}
-            />
-            <StatCard
-              label="Avg session"
-              value={`${Math.round(analytics.avg_session_duration_seconds / 60)} min`}
-            />
-          </div>
+        {/* Analytics Bar */}
+        {analytics ? (
+          <AnalyticsBar analytics={analytics} />
+        ) : (
+          <div
+            style={{
+              height: 130,
+              background: "#f1f5f9",
+              borderRadius: 8,
+              marginBottom: 10,
+            }}
+          />
         )}
 
-        {/* Classification & sentiment breakdown */}
-        {analytics && (
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700">Lead classification</h2>
-              <div className="mt-4 flex gap-3">
-                {(["hot", "warm", "cold"] as const).map((c) => (
-                  <div key={c} className={`flex-1 rounded-xl p-3 text-center ${classBadge(c)}`}>
-                    <p className="text-2xl font-bold">
-                      {analytics.classification_breakdown[c]}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold uppercase">{c}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700">Sentiment distribution</h2>
-              <div className="mt-4 flex gap-3">
-                {Object.entries(analytics.sentiment_distribution).map(([k, v]) => (
-                  <div key={k} className="flex-1 rounded-xl bg-slate-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-slate-800">{v}</p>
-                    <p className="mt-1 text-xs font-semibold uppercase text-slate-500">{k}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {analytics && (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700">Top target countries</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {analytics.top_target_countries.map((c) => (
-                  <span key={c} className="rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-800">
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-700">Language distribution</h2>
-              <div className="mt-3 flex gap-3">
-                {Object.entries(analytics.language_distribution).map(([lang, count]) => (
-                  <div key={lang} className="flex-1 rounded-xl bg-slate-50 p-3 text-center">
-                    <p className="text-xl font-bold text-slate-800">{count}</p>
-                    <p className="mt-1 text-xs font-semibold uppercase text-slate-500">{lang}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Leads table */}
-        <div className="mt-10">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-bold text-slate-900">All Leads</h2>
-            <div className="flex items-center gap-3">
-              <select
-                value={classification}
-                onChange={(e) => { setClassification(e.target.value); setPage(1); }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
-              >
-                <option value="">All classifications</option>
-                <option value="hot">Hot</option>
-                <option value="warm">Warm</option>
-                <option value="cold">Cold</option>
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
-              >
-                <option value="created_at">Sort: Newest</option>
-                <option value="lead_score">Sort: Lead score</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {loading ? (
-              <div className="space-y-2 p-6">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-10 animate-pulse rounded-xl bg-slate-100" />
-                ))}
-              </div>
-            ) : leads.length === 0 ? (
-              <p className="p-8 text-center text-slate-500">No leads found.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      <th className="px-5 py-3">Name</th>
-                      <th className="px-5 py-3">Email</th>
-                      <th className="px-5 py-3">Course</th>
-                      <th className="px-5 py-3">Countries</th>
-                      <th className="px-5 py-3">Score</th>
-                      <th className="px-5 py-3">Classification</th>
-                      <th className="px-5 py-3">Sessions</th>
-                      <th className="px-5 py-3">Last session</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {leads.map((lead) => (
-                      <tr
-                        key={lead.user_id}
-                        className="cursor-pointer transition hover:bg-slate-50"
-                        onClick={() => navigate(`/admin/leads/${lead.user_id}`)}
-                      >
-                        <td className="px-5 py-3 font-medium text-slate-900">{lead.full_name}</td>
-                        <td className="px-5 py-3 text-slate-600">{lead.email}</td>
-                        <td className="px-5 py-3 text-slate-700">{lead.target_course}</td>
-                        <td className="px-5 py-3 text-slate-600">
-                          {lead.target_countries.join(", ")}
-                        </td>
-                        <td className="px-5 py-3 font-semibold text-slate-900">
-                          {lead.latest_lead_score ?? "—"}
-                        </td>
-                        <td className="px-5 py-3">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${classBadge(
-                              lead.latest_classification
-                            )}`}
-                          >
-                            {lead.latest_classification}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-slate-600">{lead.total_sessions}</td>
-                        <td className="px-5 py-3 text-slate-500">
-                          {lead.last_session_at
-                            ? new Date(lead.last_session_at).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                              })
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-slate-500">
-                Page {page} of {totalPages} · {total} total
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => p - 1)}
-                  disabled={page === 1}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={page >= totalPages}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+        {/* Leads Table */}
+        <div style={{ marginTop: 28 }}>
+          <LeadsTable
+            leads={leads}
+            loading={loading}
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={(p: number) => setPage(p)}
+            onFilterChange={(c: string) => {
+              setClassification(c);
+              setPage(1);
+            }}
+            onSortChange={(s: string) => {
+              setSortBy(s);
+              setPage(1);
+            }}
+            onRowClick={(lead: LeadSummary) => setSelectedLead(lead)}
+          />
         </div>
       </main>
+
+      {/* Lead Detail Panel */}
+      {selectedLead && (
+        <LeadDetailPanel
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+        />
+      )}
     </div>
   );
 };
