@@ -1,38 +1,48 @@
+import { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import AuthSection from "@/components/AuthSection";
-import InfoSections from "@/components/InfoSections";
-import Footer from "@/components/Footer";
+import FatehEducationInfo from "@/components/FatehEducationInfo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { Link } from "react-router-dom";
-import { User, LayoutDashboard } from "lucide-react";
 
 const Index = () => {
   useDocumentTitle();
+  const location = useLocation();
+
+  // Smooth-scroll to hash anchors (used by Navbar + Navigate redirects)
+  useEffect(() => {
+    if (!location.hash) return;
+    const id = location.hash.replace("#", "");
+    window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }, [location.pathname, location.hash]);
 
   return (
     <div className="relative">
       <Navbar />
       <HeroSection />
       <AuthSection />
-      <InfoSections />
-      <Footer />
+      <FatehEducationInfo />
 
-      {/* Direct Demo Links */}
-      <div className="fixed bottom-10 right-10 z-[100] flex flex-col gap-3 items-end">
-        <Link 
-          to="/dashboard" 
-          className="flex items-center gap-2 rounded-full bg-slate-900 px-6 py-4 text-sm font-bold shadow-2xl text-white hover:bg-slate-800 transition-all hover:scale-105 group border-2 border-white"
+      {/* ── Dev bypass buttons (remove before production) ── */}
+      <div className="fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-3">
+        <Link
+          to="/profile"
+          className="flex items-center gap-2 rounded-full px-5 py-3 text-xs font-bold shadow-xl transition hover:scale-105 hover:shadow-2xl"
+          style={{ background: "#014fa3", color: "#fff" }}
         >
-          <LayoutDashboard className="h-4 w-4" />
-          View Dashboard Page
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Profile
         </Link>
-        <Link 
-          to="/profile" 
-          className="flex items-center gap-2 rounded-full bg-[#1c6bb0] px-6 py-4 text-sm font-bold shadow-2xl text-white hover:bg-[#15548c] transition-all hover:scale-105 group border-2 border-white"
+        <Link
+          to="/dashboard"
+          className="flex items-center gap-2 rounded-full px-5 py-3 text-xs font-bold shadow-xl transition hover:scale-105 hover:shadow-2xl"
+          style={{ background: "#ffe131", color: "#111" }}
         >
-          <User className="h-4 w-4" />
-          View Profile Page
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
         </Link>
       </div>
     </div>

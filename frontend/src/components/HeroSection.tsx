@@ -43,7 +43,7 @@ const HeroSection = () => {
       >
         <img src="/landing/fateh_logo.png" alt="Fateh Logo" className="h-20 md:h-28 lg:h-36 w-auto object-contain mb-8 drop-shadow-xl" />
         <h1 className="text-4xl md:text-5xl lg:text-7xl font-extrabold text-foreground leading-tight drop-shadow-md">
-          Best <em className="font-playfair italic text-primary not-italic font-bold" style={{ fontStyle: 'italic', fontWeight: 700 }}>Overseas</em> Education
+          Best <em className="font-playfair italic text-primary font-bold" style={{ fontStyle: 'italic', fontWeight: 700 }}>Overseas</em> Education
           <br />
           Consultants in India.
         </h1>

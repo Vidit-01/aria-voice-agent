@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import AuthPageLayout, { authLogoClassName } from "@/components/AuthPageLayout";
 import { submitProfile, uploadResume, analyzeProfile } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import type { ProfilePayload, Education, Budget, Timeline, TestScores } from "@/lib/api";
@@ -170,16 +171,24 @@ const Register = () => {
   };
 
   const inputCls =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200";
+    "w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60";
   const labelCls = "block text-sm font-medium text-slate-700 mb-1.5";
 
   return (
-    <div className="min-h-screen bg-[#f7fbff] px-4 py-12">
-      <div className="mx-auto max-w-2xl">
+    <AuthPageLayout scrollable>
+      <div className="mx-auto w-full max-w-2xl px-1">
         <div className="mb-8 text-center">
-          <img src="/landing/fateh_logo.png" alt="Fateh" className="mx-auto h-10 w-auto" />
-          <h1 className="mt-4 text-2xl font-extrabold text-slate-900">Complete your profile</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <Link to="/" className="block">
+            <img
+              src="/landing/fateh_logo.png"
+              alt="Fateh Education"
+              className={authLogoClassName}
+            />
+          </Link>
+          <h1 className="mt-5 text-2xl font-extrabold text-slate-900 drop-shadow-sm md:mt-6">
+            Complete your profile
+          </h1>
+          <p className="mt-2 text-sm text-slate-600">
             This helps our AI counselor understand your situation before your session.
           </p>
         </div>
@@ -200,7 +209,7 @@ const Register = () => {
           ))}
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+        <div className="rounded-3xl border border-white/50 bg-white/45 p-8 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           {error && (
             <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           )}
@@ -512,7 +521,7 @@ const Register = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AuthPageLayout>
   );
 };
 

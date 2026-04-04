@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const DEFAULT_TITLE = "Fateh voice agent";
+const DEFAULT_TITLE = "Fateh Voice Agent";
 
 export function useDocumentTitle(title?: string) {
   useEffect(() => {

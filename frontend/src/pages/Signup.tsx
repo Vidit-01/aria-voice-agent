@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import Footer from "@/components/Footer";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import AuthPageLayout, { authLogoClassName, glassPrimaryButtonClass } from "@/components/AuthPageLayout";
 
 const Signup = () => {
   useDocumentTitle("Sign Up");
@@ -41,22 +41,29 @@ const Signup = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f7fbff] px-4 py-12">
+    <AuthPageLayout>
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <Link to="/">
-            <img src="/landing/fateh_logo.png" alt="Fateh" className="mx-auto h-12 w-auto" />
+          <Link to="/" className="block">
+            <img
+              src="/landing/fateh_logo.png"
+              alt="Fateh Education"
+              className={authLogoClassName}
+            />
           </Link>
-          <h1 className="mt-6 text-2xl font-extrabold text-slate-900">Create your account</h1>
+          <h1 className="mt-5 text-2xl font-extrabold text-slate-900 drop-shadow-sm md:mt-6">Create your account</h1>
           <p className="mt-2 text-sm text-slate-600">
             Already have an account?{" "}
-            <Link to="/login" className="font-semibold text-sky-600 hover:underline">
+            <Link
+              to="/login"
+              className="font-semibold text-sky-700 underline decoration-sky-300/60 underline-offset-2 hover:text-sky-800"
+            >
               Log in
             </Link>
           </p>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+        <div className="rounded-3xl border border-white/50 bg-white/40 p-8 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-xl">
           {error && (
             <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           )}
@@ -71,7 +78,7 @@ const Signup = () => {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="mt-1.5 w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60"
                 placeholder="Riya Sharma"
               />
             </div>
@@ -85,7 +92,7 @@ const Signup = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="mt-1.5 w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60"
                 placeholder="you@example.com"
               />
             </div>
@@ -99,7 +106,7 @@ const Signup = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="mt-1.5 w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60"
                 placeholder="At least 8 characters"
               />
             </div>
@@ -113,24 +120,17 @@ const Signup = () => {
                 required
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="mt-1.5 w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60"
                 placeholder="••••••••"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-200 transition hover:bg-slate-800 disabled:opacity-60"
-            >
+            <button type="submit" disabled={loading} className={glassPrimaryButtonClass}>
               {loading ? "Creating account…" : "Create Account"}
             </button>
           </form>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0">
-        <Footer />
-      </div>
-    </div>
+    </AuthPageLayout>
   );
 };
 
