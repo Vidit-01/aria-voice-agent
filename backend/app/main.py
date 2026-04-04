@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,6 +12,7 @@ from app.core.config import get_settings
 
 settings = get_settings()
 app = FastAPI(title='Study Abroad Backend', version='1.0.0')
+logger = logging.getLogger(__name__)
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from typing import Any
 
-from fastapi import Depends, Header, HTTPException, Query, status
+from fastapi import Depends, Header, HTTPException, status
 from supabase import Client
 
 from app.core.supabase_client import get_supabase_client
@@ -19,7 +18,10 @@ def _extract_bearer(auth_header: str | None) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Missing authorization header')
     if not auth_header.lower().startswith('bearer '):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid authorization format')
-    return auth_header.split(' ', 1)[1].strip()
+    token = auth_header.split(' ', 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Missing bearer token')
+    return token
 
 
 def _resolve_user(token: str, supabase: Client) -> CurrentUser:
@@ -27,11 +29,9 @@ def _resolve_user(token: str, supabase: Client) -> CurrentUser:
     user = auth_resp.user
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid or expired token')
-
     profile_resp = supabase.table('profiles').select('id,email,role').eq('id', user.id).limit(1).execute()
     if not profile_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Profile not found')
-
     profile = profile_resp.data[0]
     return CurrentUser(user_id=profile['id'], email=profile.get('email'), role=profile.get('role', 'student'))
 
@@ -48,13 +48,6 @@ def require_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     if user.role != 'admin':
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Admin role required')
     return user
-
-
-def get_ws_current_user(
-    token: str = Query(...),
-    supabase: Client = Depends(get_supabase_client),
-) -> CurrentUser:
-    return _resolve_user(token, supabase)
 
 
 def require_ownership_or_admin(user: CurrentUser, target_user_id: str) -> None:

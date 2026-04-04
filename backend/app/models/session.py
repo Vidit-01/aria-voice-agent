@@ -20,24 +20,24 @@ class SessionCreateResponse(BaseModel):
     session_id: str
     user_id: str
     status: SessionStatus
-    webrtc_config: dict[str, Any]
+    webrtc_config: dict[str, Any] = Field(default_factory=dict)
     created_at: str
 
 
 class SessionMetadataResponse(BaseModel):
     session_id: str
     user_id: str
-    status: SessionStatus
+    status: SessionStatus | str
     language_detected: str | None = None
     started_at: str | None = None
     duration_seconds: int | None = None
 
 
 class SessionStatusResponse(BaseModel):
-    status: SessionStatus
+    status: SessionStatus | str
 
 
 class SessionEndResponse(BaseModel):
     message: str
     session_id: str
-    status: SessionStatus
+    status: SessionStatus | str

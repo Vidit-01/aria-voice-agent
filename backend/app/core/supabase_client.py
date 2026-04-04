@@ -6,6 +6,10 @@ from app.core.config import get_settings
 
 
 @lru_cache
-def get_supabase_client() -> Client:
+def _client() -> Client:
     settings = get_settings()
     return create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+
+def get_supabase_client() -> Client:
+    return _client()

@@ -1,19 +1,24 @@
 from datetime import datetime, timezone
+from io import BytesIO
 
-import pdfplumber
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pypdf import PdfReader
 from supabase import Client
 
 from app.core.config import get_settings
 from app.core.dependencies import CurrentUser, get_current_user, require_ownership_or_admin
 from app.core.supabase_client import get_supabase_client
 from app.models.profile import (
+    PreAnalysisPayload,
     PreAnalysisResponse,
     ProfileActionResponse,
+    ProfileScoreResponse,
     ProfileSubmitRequest,
     ProfileUpdateRequest,
+    ResumeParseResponse,
     ResumeSignedUrlResponse,
     ResumeUploadResponse,
+    SummaryResponse,
 )
 from app.services.gemini_flash import gemini_flash_service
 
@@ -73,7 +78,7 @@ async def upload_resume(
 ) -> ResumeUploadResponse:
     require_ownership_or_admin(user, user_id)
     if file.content_type != 'application/pdf':
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail='Only PDF files are allowed')
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Only PDF files are accepted')
 
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
@@ -86,6 +91,41 @@ async def upload_resume(
     signed_url = signed.get('signedURL') or signed.get('signedUrl')
     supabase.table('profiles').update({'resume_url': signed_url}).eq('id', user_id).execute()
     return ResumeUploadResponse(message='Resume uploaded successfully', resume_url=signed_url)
+
+
+@router.post('/{user_id}/resume/parse', response_model=ResumeParseResponse)
+async def parse_resume(
+    user_id: str,
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
+) -> ResumeParseResponse:
+    require_ownership_or_admin(user, user_id)
+    if file.content_type != 'application/pdf':
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Only PDF files are accepted')
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail='File too large')
+
+    try:
+        reader = PdfReader(BytesIO(content))
+        resume_text = "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Unable to parse PDF') from exc
+    if not resume_text:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='No readable text found in PDF')
+
+    parsed_profile = gemini_flash_service.parse_resume_to_profile(resume_text, user.email)
+    parsed_profile['id'] = user_id
+    parsed_profile['updated_at'] = datetime.now(timezone.utc).isoformat()
+    parsed_profile.setdefault('email', user.email)
+    score = gemini_flash_service.generate_profile_score(parsed_profile)
+    return ResumeParseResponse(
+        user_id=user_id,
+        parsed_profile=parsed_profile,
+        profile_score=score,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 @router.get('/{user_id}/resume', response_model=ResumeSignedUrlResponse)
@@ -109,12 +149,7 @@ def analyze_profile(
 ) -> PreAnalysisResponse:
     require_ownership_or_admin(user, user_id)
     profile = _load_profile_or_404(supabase, user_id)
-
-    resume_text = None
-    if profile.get('resume_url'):
-        resume_text = ''
-
-    analysis = gemini_flash_service.generate_pre_analysis(profile, resume_text)
+    analysis = gemini_flash_service.generate_pre_analysis(profile, None)
     record = {
         'user_id': user_id,
         'profile_completeness_score': analysis.profile_completeness_score,
@@ -126,6 +161,22 @@ def analyze_profile(
     inserted = supabase.table('pre_analyses').insert(record).execute()
     generated_at = inserted.data[0].get('generated_at') if inserted.data else datetime.now(timezone.utc).isoformat()
     return PreAnalysisResponse(user_id=user_id, pre_analysis=analysis, generated_at=generated_at)
+
+
+@router.get('/{user_id}/score', response_model=ProfileScoreResponse)
+def get_profile_score(
+    user_id: str,
+    user: CurrentUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
+) -> ProfileScoreResponse:
+    require_ownership_or_admin(user, user_id)
+    profile = _load_profile_or_404(supabase, user_id)
+    score = gemini_flash_service.generate_profile_score(profile)
+    return ProfileScoreResponse(
+        user_id=user_id,
+        profile_score=score,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 @router.get('/{user_id}/pre-analysis', response_model=PreAnalysisResponse)
@@ -144,11 +195,8 @@ def get_pre_analysis(
         .execute()
     )
     if not resp.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Pre-analysis not found')
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='No pre-analysis found for this user')
     row = resp.data[0]
-    from app.models.profile import PreAnalysisPayload
-
     payload = PreAnalysisPayload(
         profile_completeness_score=row['profile_completeness_score'],
         initial_observations=row['initial_observations'],
@@ -157,3 +205,16 @@ def get_pre_analysis(
         initial_lead_hint=row['initial_lead_hint'],
     )
     return PreAnalysisResponse(user_id=user_id, pre_analysis=payload, generated_at=row['generated_at'])
+
+
+@router.post('/{user_id}/summary', response_model=SummaryResponse)
+def generate_profile_summary(
+    user_id: str,
+    user: CurrentUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
+) -> SummaryResponse:
+    require_ownership_or_admin(user, user_id)
+    profile = _load_profile_or_404(supabase, user_id)
+    pre = gemini_flash_service.generate_pre_analysis(profile, None)
+    summary = " | ".join(pre.initial_observations[:3]) if pre.initial_observations else "Profile summary generated."
+    return SummaryResponse(user_id=user_id, summary=summary)

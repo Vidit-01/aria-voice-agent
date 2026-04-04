@@ -60,3 +60,28 @@ class PreAnalysisResponse(BaseModel):
     user_id: str
     pre_analysis: PreAnalysisPayload
     generated_at: str
+
+
+class SummaryResponse(BaseModel):
+    user_id: str
+    summary: str
+
+
+class ProfileScorePayload(BaseModel):
+    total_score: int
+    breakdown: dict[str, int]
+    missing_fields: list[str]
+    recommendations: list[str]
+
+
+class ProfileScoreResponse(BaseModel):
+    user_id: str
+    profile_score: ProfileScorePayload
+    generated_at: str
+
+
+class ResumeParseResponse(BaseModel):
+    user_id: str
+    parsed_profile: dict[str, Any]
+    profile_score: ProfileScorePayload
+    generated_at: str
