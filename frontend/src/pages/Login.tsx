@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import Footer from "@/components/Footer";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { Mail, Lock } from "lucide-react";
 
 const Login = () => {
   useDocumentTitle("Login");
@@ -38,64 +40,87 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f7fbff] px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <Link to="/">
-            <img src="/landing/fateh_logo.png" alt="Fateh" className="mx-auto h-12 w-auto" />
-          </Link>
-          <h1 className="mt-6 text-2xl font-extrabold text-slate-900">Welcome back</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Don&apos;t have an account?{" "}
-            <Link to="/signup" className="font-semibold text-sky-600 hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </div>
+    <div className="relative flex min-h-screen items-center justify-center bg-white px-4 overflow-hidden">
+      {/* Background Footer Graphic */}
+      <div className="absolute top-auto bottom-0 left-0 right-0 z-0">
+        <Footer />
+      </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+      {/* Login Card */}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="rounded-[2.5rem] bg-[#fcfbfa]/95 backdrop-blur-sm p-8 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/60">
+          <div className="mb-8 text-center">
+            <Link to="/">
+              <img src="/landing/fateh_logo.png" alt="Fateh" className="mx-auto h-12 w-auto" />
+            </Link>
+            <h1 className="mt-6 text-[1.7rem] font-bold text-slate-900 leading-tight">Welcome Back</h1>
+            <p className="mt-1.5 text-[0.95rem] text-slate-500">
+              Access your study abroad journey
+            </p>
+          </div>
+
           {error && (
-            <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-6 rounded-2xl bg-red-50 flex items-center px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           )}
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="email" className="block text-[0.9rem] font-semibold text-slate-600 mb-1.5 ml-1">
                 Email
               </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                placeholder="you@example.com"
-              />
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                  <Mail className="h-[1.125rem] w-[1.125rem] text-slate-400 stroke-[1.5]" />
+                </div>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="block w-full rounded-2xl border border-slate-200/80 bg-white py-3.5 pl-[2.75rem] pr-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-[0_2px_10px_rgb(0,0,0,0.02)] focus:border-[#2f88d4] focus:outline-none focus:ring-4 focus:ring-[#2f88d4]/15 transition-all"
+                  placeholder="you@example.com"
+                />
+              </div>
             </div>
+
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="password" className="block text-[0.9rem] font-semibold text-slate-600 mb-1.5 ml-1">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                  <Lock className="h-[1.125rem] w-[1.125rem] text-slate-400 stroke-[1.5]" />
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full rounded-2xl border border-slate-200/80 bg-white py-3.5 pl-[2.75rem] pr-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-[0_2px_10px_rgb(0,0,0,0.02)] focus:border-[#2f88d4] focus:outline-none focus:ring-4 focus:ring-[#2f88d4]/15 transition-all"
+                  placeholder="••••••"
+                />
+              </div>
             </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-700 disabled:opacity-60"
+              className="w-full rounded-[1.25rem] bg-[#227ecf] mt-8 py-3.5 text-[0.95rem] font-semibold text-white shadow-lg shadow-[#227ecf]/30 transition-all hover:bg-[#1c6bb0] hover:shadow-[#227ecf]/40 disabled:opacity-70"
             >
-              {loading ? "Signing in…" : "Log In"}
+              {loading ? "Logging in…" : "Log In"}
             </button>
           </form>
+
+          <p className="mt-8 text-center text-sm text-slate-500">
+            Don&apos;t have an account?{" "}
+            <Link to="/signup" className="font-semibold text-[#227ecf] hover:underline underline-offset-4">
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
     </div>
@@ -103,3 +128,4 @@ const Login = () => {
 };
 
 export default Login;
+

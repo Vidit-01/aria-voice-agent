@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import Footer from "@/components/Footer";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const Signup = () => {
@@ -125,6 +126,9 @@ const Signup = () => {
             </button>
           </form>
         </div>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0">
+        <Footer />
       </div>
     </div>
   );

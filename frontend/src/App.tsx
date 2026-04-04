@@ -14,6 +14,7 @@ import Services from "./pages/Services.tsx";
 import Countries from "./pages/Countries.tsx";
 import Projects from "./pages/Projects.tsx";
 import Contact from "./pages/Contact.tsx";
+import Profile from "./pages/Profile.tsx";
 
 // Auth pages (unauthenticated)
 import Login from "./pages/Login.tsx";
@@ -46,6 +47,8 @@ const App = () => (
             <Route path="/countries" element={<Countries />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/dashboard" element={<Dashboard />} />
 
             {/* ---- Auth (only for guests; logged-in users are redirected by useNavigate in the page) ---- */}
             <Route path="/login" element={<Login />} />
@@ -60,14 +63,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+
             <Route
               path="/session/:sessionId"
               element={
@@ -81,7 +77,7 @@ const App = () => (
             <Route
               path="/admin"
               element={
-                  <AdminDashboard />
+                <AdminDashboard />
               }
             />
             <Route
