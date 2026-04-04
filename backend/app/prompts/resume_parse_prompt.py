@@ -1,10 +1,13 @@
 RESUME_PARSE_PROMPT = """
-You are a resume parsing engine for a study-abroad platform.
-Extract structured fields from the resume text and return ONLY valid JSON.
+You are a resume parsing assistant. You will be given a student's resume as a PDF or text. Extract all available information and return it as a single compact JSON object. If a field is not found in the resume, set it to null. Do not guess or infer values that are not explicitly stated.
 
-Target schema (match keys exactly):
+Additionally, write a "resume_summary" field: a dense 7–8 line paragraph summarising the student's academic background, test scores, work or research experience, extracurriculars, financial indicators, target destinations, intended course, timeline readiness, and any scholarship or visa history. Pack in as many concrete facts as possible. This summary will be used downstream for lead analysis, so omit nothing relevant.
+
+Return ONLY valid JSON. No explanation, no markdown, no preamble.
+
+Output schema:
 {
-  "full_name": "string",
+  "full_name": "string or null",
   "phone": "string or null",
   "age": "integer or null",
   "current_education": {
@@ -35,17 +38,8 @@ Target schema (match keys exactly):
     "gmat": "number or null",
     "duolingo": "number or null"
   },
-  "previous_visa_rejection": "boolean",
-  "preferred_language": "auto"
+  "previous_visa_rejection": "boolean or null",
+  "preferred_language": "auto",
+  "resume_summary": "string"
 }
-
-Rules:
-- If unknown, use null or empty array.
-- Do not invent countries/universities unless clearly present.
-- Keep previous_visa_rejection false when not explicitly mentioned.
-- Keep preferred_language as "auto".
-
-Candidate email: {{USER_EMAIL}}
-Resume text:
-{{RESUME_TEXT}}
 """.strip()

@@ -4,7 +4,6 @@
 // ============================================================
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
-const WS_BASE = BASE_URL.replace(/^http/, "ws");
 
 // ---- Token helpers ----
 
@@ -222,7 +221,7 @@ export async function updateProfile(
 export async function uploadResume(
   userId: string,
   file: File
-): Promise<{ message: string; resume_url: string }> {
+): Promise<{ message: string; resume_url?: string }> {
   const form = new FormData();
   form.append("file", file);
   return apiFetch(`/profile/${userId}/resume`, { method: "POST", body: form }, true);
@@ -254,6 +253,53 @@ export async function analyzeProfile(userId: string): Promise<AnalyzeResponse> {
 
 export async function getPreAnalysis(userId: string): Promise<AnalyzeResponse> {
   return apiFetch<AnalyzeResponse>(`/profile/${userId}/pre-analysis`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function waitForValidPreAnalysis(
+  userId: string,
+  opts?: { attempts?: number; intervalMs?: number; requireFresh?: boolean }
+): Promise<AnalyzeResponse> {
+  const attempts = opts?.attempts ?? 20;
+  const intervalMs = opts?.intervalMs ?? 1500;
+  let requireFresh = opts?.requireFresh ?? false;
+  const startedAt = Date.now();
+  let analyzeErrorDetail: string | null = null;
+
+  try {
+    await analyzeProfile(userId);
+  } catch (err: unknown) {
+    // If analyze trigger fails, fall back to latest valid pre-analysis row.
+    analyzeErrorDetail = (err as { detail?: string })?.detail ?? "Analyze trigger failed";
+    requireFresh = false;
+  }
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const result = await getPreAnalysis(userId);
+      const generatedAtMs = Date.parse(result.generated_at);
+      const isFresh = Number.isNaN(generatedAtMs) ? true : generatedAtMs >= startedAt;
+      if (
+        result.pre_analysis &&
+        Array.isArray(result.pre_analysis.initial_observations) &&
+        result.pre_analysis.initial_observations.length > 0 &&
+        (!requireFresh || isFresh)
+      ) {
+        return result;
+      }
+    } catch {
+      // keep polling
+    }
+    await sleep(intervalMs);
+  }
+
+  throw {
+    detail: analyzeErrorDetail
+      ? `${analyzeErrorDetail}. Latest pre-analysis is unchanged.`
+      : "AI analysis is still processing. Please try again.",
+  };
 }
 
 // ================================================================
@@ -310,16 +356,6 @@ export async function endSession(
 // ================================================================
 
 // Returns a connected WebSocket for WebRTC signaling.
-export function openSignalingWS(sessionId: string): WebSocket {
-  const token = getAccessToken();
-  return new WebSocket(`${WS_BASE}/session/${sessionId}/signal?token=${token}`);
-}
-
-// Returns a connected WebSocket for the live audio/transcript stream.
-export function openStreamWS(sessionId: string): WebSocket {
-  const token = getAccessToken();
-  return new WebSocket(`${WS_BASE}/session/${sessionId}/stream?token=${token}`);
-}
 
 // ================================================================
 // 5. ADMIN — Leads & Sessions

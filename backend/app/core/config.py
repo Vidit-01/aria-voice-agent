@@ -13,7 +13,13 @@ class Settings(BaseSettings):
     supabase_anon_key: str = Field(default='dev-anon-key', alias='SUPABASE_ANON_KEY')
 
     gemini_api_key: str = Field(default='', alias='GEMINI_API_KEY')
-    gemini_flash_model: str = Field(default='gemini-1.5-flash', alias='GEMINI_FLASH_MODEL')
+    gemini_flash_model: str = Field(default='gemini-2.5-flash', alias='GEMINI_FLASH_MODEL')
+    gemini_request_timeout_seconds: int = Field(default=300, alias='GEMINI_REQUEST_TIMEOUT_SECONDS')
+    rag_embed_model: str = Field(default='text-embedding-004', alias='RAG_EMBED_MODEL')
+    rag_chat_model: str = Field(default='gemini-2.5-flash', alias='RAG_CHAT_MODEL')
+    rag_top_k: int = Field(default=4, alias='RAG_TOP_K')
+    rag_chunk_size: int = Field(default=1000, alias='RAG_CHUNK_SIZE')
+    rag_chunk_overlap: int = Field(default=150, alias='RAG_CHUNK_OVERLAP')
 
     app_secret_key: str = Field(default='change-me', alias='APP_SECRET_KEY')
     company_name: str = Field(default='YourCompanyName', alias='COMPANY_NAME')

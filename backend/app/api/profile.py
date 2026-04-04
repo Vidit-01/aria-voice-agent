@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from io import BytesIO
+import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pypdf import PdfReader
@@ -24,6 +25,7 @@ from app.services.gemini_flash import gemini_flash_service
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _load_profile_or_404(supabase: Client, user_id: str) -> dict:
@@ -31,6 +33,55 @@ def _load_profile_or_404(supabase: Client, user_id: str) -> dict:
     if not resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Profile not found')
     return resp.data[0]
+
+
+def _extract_pdf_text(content: bytes) -> str:
+    reader = PdfReader(BytesIO(content))
+    return "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+
+
+def _is_missing(value) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, (list, dict)):
+        return len(value) == 0
+    return False
+
+
+def _deep_merge_for_prefill(existing: dict, parsed: dict) -> dict:
+    merged = dict(existing)
+    for key, parsed_value in parsed.items():
+        existing_value = merged.get(key)
+        if isinstance(parsed_value, dict):
+            base = existing_value if isinstance(existing_value, dict) else {}
+            merged[key] = _deep_merge_for_prefill(base, parsed_value)
+            continue
+        if _is_missing(existing_value) and not _is_missing(parsed_value):
+            merged[key] = parsed_value
+    return merged
+
+
+def _store_pre_analysis(
+    supabase: Client,
+    user_id: str,
+    profile: dict,
+    resume_text: str | None = None,
+    strict: bool = False,
+) -> tuple[PreAnalysisPayload, str]:
+    analysis = gemini_flash_service.generate_pre_analysis(profile, resume_text, strict=strict)
+    record = {
+        'user_id': user_id,
+        'profile_completeness_score': analysis.profile_completeness_score,
+        'initial_observations': analysis.initial_observations,
+        'gaps_to_probe': analysis.gaps_to_probe,
+        'suggested_focus_areas': analysis.suggested_focus_areas,
+        'initial_lead_hint': analysis.initial_lead_hint,
+    }
+    inserted = supabase.table('pre_analyses').insert(record).execute()
+    generated_at = inserted.data[0].get('generated_at') if inserted.data else datetime.now(timezone.utc).isoformat()
+    return analysis, generated_at
 
 
 @router.post('/submit', response_model=ProfileActionResponse)
@@ -84,13 +135,53 @@ async def upload_resume(
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail='File too large')
 
+    parsed_profile = None
+    profile_score = None
+    resume_text: str | None = None
+    updated_at = datetime.now(timezone.utc).isoformat()
+    existing = _load_profile_or_404(supabase, user_id)
+    merged = dict(existing)
+    try:
+        resume_text = _extract_pdf_text(content)
+        if resume_text:
+            parsed_profile = gemini_flash_service.parse_resume_to_profile(resume_text, user.email)
+            merged = _deep_merge_for_prefill(existing, parsed_profile)
+            profile_score = gemini_flash_service.generate_profile_score(merged)
+    except Exception:
+        # Keep upload flow resilient even if parsing fails.
+        pass
+
+    merged['id'] = user_id
+    merged['email'] = user.email
+    merged['updated_at'] = updated_at
+
     settings = get_settings()
     path = f'{user_id}/resume.pdf'
-    supabase.storage.from_(settings.resume_bucket).upload(path, content, {'content-type': 'application/pdf', 'upsert': 'true'})
-    signed = supabase.storage.from_(settings.resume_bucket).create_signed_url(path, 3600)
-    signed_url = signed.get('signedURL') or signed.get('signedUrl')
-    supabase.table('profiles').update({'resume_url': signed_url}).eq('id', user_id).execute()
-    return ResumeUploadResponse(message='Resume uploaded successfully', resume_url=signed_url)
+    try:
+        supabase.storage.from_(settings.resume_bucket).upload(path, content, {'content-type': 'application/pdf', 'upsert': 'true'})
+        signed = supabase.storage.from_(settings.resume_bucket).create_signed_url(path, 3600)
+        signed_url = signed.get('signedURL') or signed.get('signedUrl')
+        merged['resume_url'] = signed_url
+        supabase.table('profiles').upsert(merged).execute()
+        if resume_text:
+            _store_pre_analysis(supabase, user_id, merged, resume_text)
+        return ResumeUploadResponse(
+            message='Resume uploaded and parsed successfully' if parsed_profile else 'Resume uploaded successfully',
+            resume_url=signed_url,
+            parsed_profile=parsed_profile,
+            profile_score=profile_score,
+        )
+    except Exception:
+        # Save parsed profile data even when storage upload fails due bucket/RLS issues.
+        supabase.table('profiles').upsert(merged).execute()
+        if resume_text:
+            _store_pre_analysis(supabase, user_id, merged, resume_text)
+        return ResumeUploadResponse(
+            message='Resume parsed but storage upload failed (check bucket policies)',
+            resume_url=merged.get('resume_url'),
+            parsed_profile=parsed_profile,
+            profile_score=profile_score,
+        )
 
 
 @router.post('/{user_id}/resume/parse', response_model=ResumeParseResponse)
@@ -119,7 +210,14 @@ async def parse_resume(
     parsed_profile['id'] = user_id
     parsed_profile['updated_at'] = datetime.now(timezone.utc).isoformat()
     parsed_profile.setdefault('email', user.email)
-    score = gemini_flash_service.generate_profile_score(parsed_profile)
+    existing = _load_profile_or_404(supabase, user_id)
+    merged = _deep_merge_for_prefill(existing, parsed_profile)
+    merged['id'] = user_id
+    merged['email'] = user.email
+    merged['updated_at'] = parsed_profile['updated_at']
+    supabase.table('profiles').upsert(merged).execute()
+    _store_pre_analysis(supabase, user_id, merged, resume_text)
+    score = gemini_flash_service.generate_profile_score(merged)
     return ResumeParseResponse(
         user_id=user_id,
         parsed_profile=parsed_profile,
@@ -149,17 +247,14 @@ def analyze_profile(
 ) -> PreAnalysisResponse:
     require_ownership_or_admin(user, user_id)
     profile = _load_profile_or_404(supabase, user_id)
-    analysis = gemini_flash_service.generate_pre_analysis(profile, None)
-    record = {
-        'user_id': user_id,
-        'profile_completeness_score': analysis.profile_completeness_score,
-        'initial_observations': analysis.initial_observations,
-        'gaps_to_probe': analysis.gaps_to_probe,
-        'suggested_focus_areas': analysis.suggested_focus_areas,
-        'initial_lead_hint': analysis.initial_lead_hint,
-    }
-    inserted = supabase.table('pre_analyses').insert(record).execute()
-    generated_at = inserted.data[0].get('generated_at') if inserted.data else datetime.now(timezone.utc).isoformat()
+    try:
+        analysis, generated_at = _store_pre_analysis(supabase, user_id, profile, None, strict=True)
+    except Exception as exc:
+        logger.exception('Gemini pre-analysis failed for user_id=%s', user_id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f'AI pre-analysis failed: {exc}',
+        ) from exc
     return PreAnalysisResponse(user_id=user_id, pre_analysis=analysis, generated_at=generated_at)
 
 

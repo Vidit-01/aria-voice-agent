@@ -40,7 +40,9 @@ class ProfileActionResponse(BaseModel):
 
 class ResumeUploadResponse(BaseModel):
     message: str
-    resume_url: str
+    resume_url: str | None = None
+    parsed_profile: dict[str, Any] | None = None
+    profile_score: 'ProfileScorePayload | None' = None
 
 
 class ResumeSignedUrlResponse(BaseModel):

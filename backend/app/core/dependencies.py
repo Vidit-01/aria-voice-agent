@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from fastapi import Depends, Header, HTTPException, status
 from supabase import Client
+from supabase_auth.errors import AuthApiError
 
 from app.core.supabase_client import get_supabase_client
 
@@ -25,7 +26,11 @@ def _extract_bearer(auth_header: str | None) -> str:
 
 
 def _resolve_user(token: str, supabase: Client) -> CurrentUser:
-    auth_resp = supabase.auth.get_user(token)
+    try:
+        auth_resp = supabase.auth.get_user(token)
+    except AuthApiError as exc:
+        # Normalize Supabase auth failures (expired/invalid JWT) into 401.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid or expired token') from exc
     user = auth_resp.user
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid or expired token')

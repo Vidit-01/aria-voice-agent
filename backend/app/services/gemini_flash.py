@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from app.core.config import get_settings
@@ -21,43 +22,167 @@ def _render(template: str, replacements: dict[str, Any]) -> str:
     return text
 
 
+def _extract_json_text(raw: str) -> str:
+    text = (raw or '').strip()
+    if not text:
+        raise RuntimeError('Empty model response')
+
+    # Handle fenced markdown output: ```json ... ```
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
+    if fence:
+        return fence.group(1).strip()
+
+    # If model added prose around JSON, extract from first { to last }.
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1].strip()
+
+    return text
+
+
 class GeminiFlashService:
     def __init__(self) -> None:
         settings = get_settings()
         self.model_name = settings.gemini_flash_model
+        self.request_timeout_seconds = max(1, int(settings.gemini_request_timeout_seconds))
         self.enabled = bool(genai and settings.gemini_api_key)
+        self.model_candidates = [self.model_name]
         if self.enabled:
             genai.configure(api_key=settings.gemini_api_key)
-            self.model = genai.GenerativeModel(self.model_name)
+            self.model_candidates = self._resolve_model_candidates()
+            self.model = None
         else:
             self.model = None
 
+    def _resolve_model_candidates(self) -> list[str]:
+        preferred = [
+            self.model_name,
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
+            'gemini-2.5-pro',
+            'gemini-2.0-flash',
+        ]
+        deduped_preferred = list(dict.fromkeys(preferred))
+        try:
+            available = set()
+            for m in genai.list_models():
+                methods = set(getattr(m, 'supported_generation_methods', []) or [])
+                if 'generateContent' not in methods:
+                    continue
+                name = getattr(m, 'name', '')
+                if not name:
+                    continue
+                available.add(name.replace('models/', ''))
+
+            resolved = [name for name in deduped_preferred if name in available]
+            return resolved if resolved else deduped_preferred
+        except Exception:
+            return deduped_preferred
+
     def _generate_json(self, prompt: str) -> dict[str, Any]:
-        if not self.model:
+        if not self.enabled:
             raise RuntimeError('Gemini not configured')
         last_error: Exception | None = None
-        for _ in range(3):
-            try:
-                response = self.model.generate_content(prompt)
-                raw = (response.text or '').strip()
-                return json.loads(raw)
-            except Exception as exc:
-                last_error = exc
+        for candidate in self.model_candidates:
+            for _ in range(2):
+                try:
+                    model = genai.GenerativeModel(candidate)
+                    response = model.generate_content(
+                        prompt,
+                        generation_config={'response_mime_type': 'application/json'},
+                        request_options={'timeout': self.request_timeout_seconds},
+                    )
+                    raw = _extract_json_text(response.text or '')
+                    return json.loads(raw)
+                except Exception as exc:
+                    last_error = exc
         raise RuntimeError(f'Gemini JSON generation failed: {last_error}')
 
-    def generate_pre_analysis(self, profile: dict[str, Any], resume_text: str | None = None) -> PreAnalysisPayload:
+    def _normalize_pre_analysis_payload(self, payload: Any, profile: dict[str, Any]) -> dict[str, Any]:
+        data = payload if isinstance(payload, dict) else {}
+
+        score_candidate = (
+            data.get('profile_completeness_score')
+            or data.get('profile_score')
+            or data.get('completeness_score')
+        )
+        if isinstance(score_candidate, (int, float)):
+            score = int(max(0, min(100, score_candidate)))
+        else:
+            score = self.generate_profile_score(profile).total_score
+
+        observations = data.get('initial_observations') or data.get('observations')
+        if isinstance(observations, str):
+            observations = [observations]
+        if not isinstance(observations, list) or not observations:
+            summary = data.get('summary')
+            observations = [summary] if isinstance(summary, str) and summary.strip() else [
+                'Profile captured. AI returned partial output.'
+            ]
+
+        gaps = data.get('gaps_to_probe') or data.get('missing_fields')
+        if isinstance(gaps, str):
+            gaps = [gaps]
+        if not isinstance(gaps, list) or not gaps:
+            gaps = ['Funding readiness', 'University shortlist rationale', 'Timeline confidence']
+
+        focus = data.get('suggested_focus_areas') or data.get('recommended_actions')
+        if isinstance(focus, str):
+            focus = [focus]
+        if not isinstance(focus, list) or not focus:
+            focus = ['financial_readiness', 'timeline_urgency']
+
+        hint = data.get('initial_lead_hint') or data.get('lead_hint') or 'warm'
+        if not isinstance(hint, str):
+            hint = 'warm'
+
+        return {
+            'profile_completeness_score': score,
+            'initial_observations': [str(x) for x in observations if str(x).strip()],
+            'gaps_to_probe': [str(x) for x in gaps if str(x).strip()],
+            'suggested_focus_areas': [str(x) for x in focus if str(x).strip()],
+            'initial_lead_hint': hint.lower(),
+        }
+
+    def generate_pre_analysis(
+        self,
+        profile: dict[str, Any],
+        resume_text: str | None = None,
+        strict: bool = False,
+    ) -> PreAnalysisPayload:
         if not self.enabled:
-            return PreAnalysisPayload(
-                profile_completeness_score=70,
-                initial_observations=['Profile captured. Enable Gemini API key for richer analysis.'],
-                gaps_to_probe=['Funding readiness', 'University shortlist rationale', 'Timeline confidence'],
-                suggested_focus_areas=['financial_readiness', 'timeline_urgency'],
-                initial_lead_hint='warm',
-            )
+            if strict:
+                raise RuntimeError('Gemini not configured')
+            return self._fallback_pre_analysis('Profile captured. Enable Gemini API key for richer analysis.')
         prompt = _render(PRE_ANALYSIS_PROMPT, {'PROFILE_JSON': profile, 'RESUME_TEXT': resume_text or ''})
-        parsed = self._generate_json(prompt)
-        payload = parsed.get('pre_analysis', parsed)
-        return PreAnalysisPayload.model_validate(payload)
+        try:
+            parsed = self._generate_json(prompt)
+        except Exception:
+            if strict:
+                raise
+            return self._fallback_pre_analysis('Gemini analysis fallback used due to model/API response issue.')
+
+        payload = parsed.get('pre_analysis', parsed) if isinstance(parsed, dict) else parsed
+        try:
+            return PreAnalysisPayload.model_validate(payload)
+        except Exception:
+            normalized = self._normalize_pre_analysis_payload(payload, profile)
+            try:
+                return PreAnalysisPayload.model_validate(normalized)
+            except Exception:
+                if strict:
+                    raise RuntimeError('Gemini returned invalid pre-analysis schema')
+                return self._fallback_pre_analysis('Gemini analysis fallback used due to model/API response issue.')
+
+    def _fallback_pre_analysis(self, first_observation: str) -> PreAnalysisPayload:
+        return PreAnalysisPayload(
+            profile_completeness_score=70,
+            initial_observations=[first_observation],
+            gaps_to_probe=['Funding readiness', 'University shortlist rationale', 'Timeline confidence'],
+            suggested_focus_areas=['financial_readiness', 'timeline_urgency'],
+            initial_lead_hint='warm',
+        )
 
     def parse_resume_to_profile(self, resume_text: str, user_email: str | None = None) -> dict[str, Any]:
         if not self.enabled:
@@ -77,15 +202,32 @@ class GeminiFlashService:
                 'email': user_email,
             }
         prompt = _render(RESUME_PARSE_PROMPT, {'RESUME_TEXT': resume_text, 'USER_EMAIL': user_email or ''})
-        parsed = self._generate_json(prompt)
-        if not isinstance(parsed, dict):
-            raise RuntimeError('Gemini resume parser returned invalid structure')
-        parsed['email'] = user_email
-        parsed.setdefault('previous_visa_rejection', False)
-        parsed.setdefault('preferred_language', 'auto')
-        parsed.setdefault('target_countries', [])
-        parsed.setdefault('target_universities', [])
-        return parsed
+        try:
+            parsed = self._generate_json(prompt)
+            if not isinstance(parsed, dict):
+                raise RuntimeError('Gemini resume parser returned invalid structure')
+            parsed['email'] = user_email
+            parsed.setdefault('previous_visa_rejection', False)
+            parsed.setdefault('preferred_language', 'auto')
+            parsed.setdefault('target_countries', [])
+            parsed.setdefault('target_universities', [])
+            return parsed
+        except Exception:
+            return {
+                'full_name': '',
+                'phone': None,
+                'age': None,
+                'current_education': None,
+                'target_countries': [],
+                'target_course': None,
+                'target_universities': [],
+                'budget': None,
+                'timeline': None,
+                'test_scores': None,
+                'previous_visa_rejection': False,
+                'preferred_language': 'auto',
+                'email': user_email,
+            }
 
     def generate_profile_score(self, profile: dict[str, Any]) -> ProfileScorePayload:
         breakdown = {

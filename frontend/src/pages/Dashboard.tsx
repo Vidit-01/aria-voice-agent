@@ -1,3 +1,18 @@
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
+import {
+  getProfile,
+  getPreAnalysis,
+  createSession,
+  getSession,
+  getResumeUrl,
+  uploadResume,
+  waitForValidPreAnalysis,
+  type ProfileResponse,
+  type PreAnalysis,
+  type SessionData,
+} from "@/lib/api";
 import { Link } from "react-router-dom";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
@@ -86,8 +101,250 @@ const navItems = [
   { icon: BookOpen, label: "Resources", href: "#", active: false },
 ];
 
+// ---- Local session store helpers ----
+// Since the API has no "list my sessions" endpoint for students, we keep track locally.
+
+interface StoredSession {
+  session_id: string;
+  created_at: string;
+  status: string;
+  duration_seconds?: number | null;
+  language_detected?: string;
+}
+
+interface UniversitySuggestion {
+  name: string;
+  country: string;
+}
+
+const EUROPE_UNIVERSITIES: UniversitySuggestion[] = [
+  { name: "University of Amsterdam", country: "Netherlands" },
+  { name: "TU Delft", country: "Netherlands" },
+  { name: "KU Leuven", country: "Belgium" },
+  { name: "University of Copenhagen", country: "Denmark" },
+  { name: "LMU Munich", country: "Germany" },
+  { name: "Heidelberg University", country: "Germany" },
+  { name: "ETH Zurich", country: "Switzerland" },
+  { name: "EPFL", country: "Switzerland" },
+  { name: "Trinity College Dublin", country: "Ireland" },
+  { name: "University College Dublin", country: "Ireland" },
+  { name: "University of Edinburgh", country: "United Kingdom" },
+  { name: "University of Manchester", country: "United Kingdom" },
+  { name: "Sorbonne University", country: "France" },
+  { name: "Sciences Po", country: "France" },
+  { name: "University of Bologna", country: "Italy" },
+  { name: "Sapienza University of Rome", country: "Italy" },
+  { name: "University of Barcelona", country: "Spain" },
+  { name: "Autonomous University of Madrid", country: "Spain" },
+];
+
+function pickRandomUniversities(targetCountries: string[] | undefined, count = 3): UniversitySuggestion[] {
+  const normalizedTargets = (targetCountries ?? []).map((c) => c.trim().toLowerCase());
+  const pool = normalizedTargets.length
+    ? EUROPE_UNIVERSITIES.filter((u) => normalizedTargets.includes(u.country.toLowerCase()))
+    : EUROPE_UNIVERSITIES;
+  const base = pool.length > 0 ? pool : EUROPE_UNIVERSITIES;
+  const selected: UniversitySuggestion[] = [];
+  const used = new Set<number>();
+  const max = Math.min(count, base.length);
+  while (selected.length < max) {
+    const idx = Math.floor(Math.random() * base.length);
+    if (used.has(idx)) continue;
+    used.add(idx);
+    selected.push(base[idx]);
+  }
+  return selected;
+}
+
+function getStoredSessions(userId: string): StoredSession[] {
+  try {
+    return JSON.parse(localStorage.getItem(`sessions_${userId}`) || "[]") as StoredSession[];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredSessions(userId: string, sessions: StoredSession[]): void {
+  localStorage.setItem(`sessions_${userId}`, JSON.stringify(sessions));
+}
+
+function pushSession(userId: string, s: StoredSession): void {
+  const existing = getStoredSessions(userId).filter((x) => x.session_id !== s.session_id);
+  saveStoredSessions(userId, [s, ...existing]);
+}
+
+// ---- Classification badge ----
+
+const classBadge = (c?: string) => {
+  if (c === "hot") return "bg-red-100 text-red-700";
+  if (c === "warm") return "bg-amber-100 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+};
+
+// ---- Dashboard ----
+
 const Dashboard = () => {
   useDocumentTitle("Student Dashboard");
+  useDocumentTitle("Dashboard");
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [analysis, setAnalysis] = useState<{ pre_analysis: PreAnalysis; generated_at: string } | null>(null);
+  const [sessions, setSessions] = useState<StoredSession[]>([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [sessionStarting, setSessionStarting] = useState(false);
+  const [resumeUploading, setResumeUploading] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [suggestedUniversities, setSuggestedUniversities] = useState<UniversitySuggestion[]>([]);
+  const [error, setError] = useState("");
+
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    setProfileLoading(true);
+    setSuggestedUniversities(pickRandomUniversities(undefined));
+    try {
+      const [p, a] = await Promise.allSettled([
+        getProfile(user.user_id),
+        getPreAnalysis(user.user_id),
+      ]);
+      if (p.status === "fulfilled") setProfile(p.value);
+      if (a.status === "fulfilled") setAnalysis(a.value);
+      if (p.status === "fulfilled") {
+        setSuggestedUniversities(pickRandomUniversities(p.value.target_countries));
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [user]);
+
+  const pollForAnalysis = useCallback(async () => {
+    if (!user) return;
+    setAnalysisLoading(true);
+    try {
+      const latest = await waitForValidPreAnalysis(user.user_id, {
+        attempts: 25,
+        intervalMs: 1500,
+        requireFresh: true,
+      });
+      setAnalysis(latest);
+    } catch (err: unknown) {
+      const msg = (err as { detail?: string })?.detail ?? "AI analysis failed. Please retry.";
+      setError(msg);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }, [user]);
+
+  // Refresh stored sessions against the backend to pick up status changes
+  const refreshSessions = useCallback(async () => {
+    if (!user) return;
+    const stored = getStoredSessions(user.user_id);
+    if (stored.length === 0) return;
+    const updated = await Promise.all(
+      stored.map(async (s) => {
+        try {
+          const live = await getSession(s.session_id);
+          return {
+            ...s,
+            status: live.status,
+            duration_seconds: live.duration_seconds,
+            language_detected: live.language_detected,
+          };
+        } catch {
+          return s;
+        }
+      })
+    );
+    saveStoredSessions(user.user_id, updated);
+    setSessions(updated);
+  }, [user]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!user) return;
+    const stored = getStoredSessions(user.user_id);
+    setSessions(stored);
+    refreshSessions();
+  }, [user, refreshSessions]);
+
+  useEffect(() => {
+    if (!profileLoading && profile && !analysis && !analysisLoading) {
+      pollForAnalysis();
+    }
+  }, [profileLoading, profile, analysis, analysisLoading, pollForAnalysis]);
+
+  const startSession = async () => {
+    if (!user) return;
+    setSessionStarting(true);
+    setError("");
+    try {
+      const res = await createSession(user.user_id, profile?.preferred_language ?? "auto");
+      // Persist so the session appears in the list
+      pushSession(user.user_id, {
+        session_id: res.session_id,
+        created_at: res.created_at,
+        status: "created",
+      });
+      navigate(`/session/${res.session_id}`, {
+        state: { webrtc_config: res.webrtc_config },
+      });
+    } catch (err: unknown) {
+      const msg = (err as { detail?: string })?.detail ?? "Could not start session.";
+      setError(msg);
+    } finally {
+      setSessionStarting(false);
+    }
+  };
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.type !== "application/pdf") {
+      setError("Only PDF files are accepted.");
+      return;
+    }
+    setResumeUploading(true);
+    setError("");
+    try {
+      await uploadResume(user.user_id, file);
+      await pollForAnalysis();
+      await loadData();
+    } catch (err: unknown) {
+      const msg = (err as { detail?: string })?.detail ?? "Upload failed.";
+      setError(msg);
+    } finally {
+      setResumeUploading(false);
+    }
+  };
+
+  const viewResume = async () => {
+    if (!user) return;
+    try {
+      const { signed_url } = await getResumeUrl(user.user_id);
+      setResumeUrl(signed_url);
+      window.open(signed_url, "_blank");
+    } catch {
+      setError("Could not fetch resume URL.");
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/", { replace: true });
+  };
+
+  const hintColor = (hint?: string) => {
+    if (hint === "hot") return "text-red-600";
+    if (hint === "warm") return "text-amber-600";
+    return "text-slate-500";
+  };
+
+  const completeness = analysis?.pre_analysis.profile_completeness_score ?? null;
 
   return (
     <div className="flex min-h-screen bg-[#FDFBF7] font-sans">
@@ -390,6 +647,22 @@ const Dashboard = () => {
                     <div className="mt-4 mb-5 border-l-2 border-[#104886] pl-4">
                        <p className="text-[0.9rem] font-extrabold text-slate-900">February 15, 2024</p>
                        <p className="text-sm font-semibold text-slate-500">10:00 AM IST</p>
+              {profileLoading ? (
+                <div className="mt-4 h-32 animate-pulse rounded-xl bg-slate-100" />
+              ) : analysisLoading ? (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-sky-700">Loading AI analysis...</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    We are waiting for Gemini to return the updated analysis.
+                  </p>
+                </div>
+              ) : analysis ? (
+                <div className="mt-4 space-y-4">
+                  {/* Profile completeness bar */}
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Profile completeness</span>
+                      <span>{completeness}%</span>
                     </div>
                     <button className="w-full rounded-xl bg-[#104886] px-4 py-3 text-sm font-bold text-white hover:bg-[#0c3666] transition-colors shadow-sm">
                        Start Interview
@@ -483,6 +756,74 @@ const Dashboard = () => {
                       <div>
                         <h4 className="text-[0.85rem] font-extrabold text-rose-900 mb-1 leading-tight">Action Required</h4>
                         <p className="text-[0.75rem] font-medium text-rose-700/90 leading-snug">Upload transcript for final year to instantly unlock more accurate matches.</p>
+                  </div>
+                </div>
+              ) : profile ? (
+                <div className="mt-4">
+                  <p className="text-sm text-slate-500">No analysis yet.</p>
+                  <button
+                    onClick={pollForAnalysis}
+                    className="mt-3 rounded-lg bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                  >
+                    {analysisLoading ? "Loading AI analysis..." : "Run Analysis"}
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-500">Complete your profile first.</p>
+              )}
+
+              <div className="mt-6 border-t border-slate-100 pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Europe Suggestions (Random 3)
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {suggestedUniversities.map((u) => (
+                    <li key={`${u.name}-${u.country}`} className="text-sm text-slate-700">
+                      {u.name} ({u.country})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+
+            {/* Sessions list */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="font-semibold text-slate-900">My Sessions</h2>
+              {sessions.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">
+                  No sessions yet. Click <strong>Start AI Session</strong> above to begin.
+                </p>
+              ) : (
+                <ul className="mt-4 divide-y divide-slate-100">
+                  {sessions.map((s) => (
+                    <li key={s.session_id} className="py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            {new Date(s.created_at).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {s.duration_seconds
+                              ? `${Math.round(s.duration_seconds / 60)} min`
+                              : "–"}
+                            {s.language_detected ? ` · ${s.language_detected.toUpperCase()}` : ""}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${classBadge(undefined)} ${
+                            s.status === "active"
+                              ? "bg-green-100 text-green-700"
+                              : s.status === "ended"
+                              ? "bg-slate-100 text-slate-600"
+                              : "bg-sky-100 text-sky-600"
+                          }`}
+                        >
+                          {s.status}
+                        </span>
                       </div>
                     </div>
 
