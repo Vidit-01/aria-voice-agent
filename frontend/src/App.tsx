@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -43,11 +43,45 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 // Pages where the global navbar must NOT appear (they have their own full-screen layouts)
 const NO_NAVBAR = ["/login", "/signup", "/voice-agent"];
+const ALWAYS_MUTED_VIDEO_PATTERN = /\/(landing\/sky\.mp4|may\.mp4)(\?|$)/i;
 
 function GlobalNavbar() {
   const { pathname } = useLocation();
   if (NO_NAVBAR.some((p) => pathname.startsWith(p))) return null;
   return <Navbar />;
+}
+
+function GlobalVideoMuteGuard() {
+  useEffect(() => {
+    const enforceMuted = () => {
+      const videos = document.querySelectorAll("video");
+      videos.forEach((video) => {
+        const ownSrc = video.getAttribute("src") ?? "";
+        const sourceSrc =
+          Array.from(video.querySelectorAll("source"))
+            .map((s) => s.getAttribute("src") ?? "")
+            .find((src) => ALWAYS_MUTED_VIDEO_PATTERN.test(src)) ?? "";
+        const candidate = ownSrc || sourceSrc || video.currentSrc || "";
+
+        if (!ALWAYS_MUTED_VIDEO_PATTERN.test(candidate)) return;
+        video.muted = true;
+        video.defaultMuted = true;
+        video.volume = 0;
+      });
+    };
+
+    enforceMuted();
+    const observer = new MutationObserver(enforceMuted);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    const timer = window.setInterval(enforceMuted, 1200);
+
+    return () => {
+      observer.disconnect();
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  return null;
 }
 
 import Index from "./pages/Index.tsx";
@@ -76,6 +110,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <GlobalVideoMuteGuard />
           <GlobalNavbar />
           <Routes>
             {/* ── Public ── */}

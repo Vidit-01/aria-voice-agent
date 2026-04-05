@@ -2,6 +2,8 @@
   --vBlue: #1d4ed8;
   --vBlue2: #38bdf8;
   --vYellow: #fbbf24;
+  --vIndigo: #4338ca;
+  --vSlate: #0f172a;
   --ink: rgba(2, 6, 23, 0.88);
   --muted: rgba(2, 6, 23, 0.62);
 }
@@ -12,7 +14,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #e8f1ff;
+  background: #e8eefc;
   z-index: 50;
 }
 
@@ -20,12 +22,36 @@
   position: absolute;
   inset: -80px;
   background:
-    radial-gradient(920px 520px at 18% 22%, rgba(56, 189, 248, 0.2), transparent 62%),
-    radial-gradient(760px 420px at 62% 16%, rgba(29, 78, 216, 0.14), transparent 64%),
-    radial-gradient(720px 420px at 74% 66%, rgba(251, 191, 36, 0.16), transparent 62%);
+    radial-gradient(980px 560px at 18% 22%, rgba(56, 189, 248, 0.28), transparent 62%),
+    radial-gradient(760px 430px at 62% 16%, rgba(29, 78, 216, 0.2), transparent 64%),
+    radial-gradient(760px 440px at 74% 66%, rgba(251, 191, 36, 0.2), transparent 62%);
   filter: blur(0px);
   pointer-events: none;
   z-index: 0;
+}
+
+.appBg::before {
+  content: '';
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  left: 8%;
+  top: 10%;
+  border-radius: 33% 67% 62% 38% / 44% 38% 62% 56%;
+  background: linear-gradient(150deg, rgba(125, 211, 252, 0.24), rgba(165, 180, 252, 0.12));
+  filter: blur(2px);
+}
+
+.appBg::after {
+  content: '';
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  right: 14%;
+  bottom: 8%;
+  border-radius: 62% 38% 30% 70% / 42% 64% 36% 58%;
+  background: linear-gradient(130deg, rgba(251, 191, 36, 0.2), rgba(56, 189, 248, 0.1));
+  filter: blur(2px);
 }
 
 .cloudVideoBg {
@@ -41,10 +67,35 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.64) 70%, rgba(255, 255, 255, 0.78) 100%),
-    radial-gradient(780px 360px at 25% 20%, rgba(255, 255, 255, 0.22), transparent 60%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(245, 249, 255, 0.68) 66%, rgba(245, 249, 255, 0.84) 100%),
+    radial-gradient(940px 420px at 25% 20%, rgba(255, 255, 255, 0.32), transparent 60%),
+    radial-gradient(880px 380px at 72% 70%, rgba(191, 219, 254, 0.24), transparent 62%);
   pointer-events: none;
   z-index: 0;
+}
+
+.cloudBgShade::before {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  left: 42%;
+  top: 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 34%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.06));
+  filter: blur(1px);
+}
+
+.cloudBgShade::after {
+  content: '';
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  right: 36%;
+  bottom: 14%;
+  border-radius: 44% 56% 66% 34% / 52% 32% 68% 48%;
+  background: linear-gradient(160deg, rgba(196, 181, 253, 0.18), rgba(191, 219, 254, 0.08));
+  filter: blur(1px);
 }
 
 .vaTopBar {
@@ -120,12 +171,13 @@
 }
 
 .card {
+  position: relative;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(29, 78, 216, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(37, 99, 235, 0.12);
   box-shadow:
-    0 24px 54px rgba(2, 6, 23, 0.12),
-    0 8px 18px rgba(2, 6, 23, 0.08);
+    0 22px 52px rgba(15, 23, 42, 0.12),
+    0 8px 20px rgba(30, 41, 59, 0.08);
   backdrop-filter: blur(14px);
   overflow: hidden;
 }
@@ -135,6 +187,35 @@
   place-items: center;
   padding: 22px;
   min-height: 520px;
+  background:
+    radial-gradient(680px 340px at 80% -8%, rgba(147, 197, 253, 0.26), transparent 64%),
+    radial-gradient(540px 260px at -10% 110%, rgba(196, 181, 253, 0.2), transparent 62%),
+    rgba(255, 255, 255, 0.76);
+}
+
+.leftCard::before {
+  content: '';
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 40% 60% 58% 42% / 42% 43% 57% 58%;
+  background: linear-gradient(140deg, rgba(56, 189, 248, 0.2), rgba(99, 102, 241, 0.16));
+  filter: blur(1px);
+  top: 26px;
+  right: 56px;
+  pointer-events: none;
+}
+
+.leftCard::after {
+  content: '';
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 58% 42% 46% 54% / 54% 45% 55% 46%;
+  background: linear-gradient(150deg, rgba(147, 197, 253, 0.2), rgba(244, 114, 182, 0.08));
+  bottom: 22px;
+  left: 30px;
+  pointer-events: none;
 }
 
 .isBarePanel {
@@ -173,6 +254,7 @@
   align-items: center;
   gap: 18px;
   padding: 10px 6px 6px;
+  position: relative;
 }
 
 .agentPanel.isMinimized {
@@ -186,34 +268,69 @@
 }
 
 .voiceBlobWrap {
-  display: grid;
-  place-items: center;
+  --avatar-offset-x: 0px;
+  --avatar-offset-y: 0px;
+  width: 400px;
+  height: 400px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .blob {
-  width: 186px;
-  height: 186px;
+  width: 330px;
+  height: 330px;
   border-radius: 50%;
-  background:
-    radial-gradient(120px 120px at 30% 28%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.35)),
-    linear-gradient(150deg, #dbeafe 0%, #c4b5fd 55%, #bfdbfe 100%);
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   box-shadow:
-    0 20px 45px rgba(37, 99, 235, 0.16),
-    0 0 28px rgba(125, 211, 252, 0.62),
-    inset 0 0 10px rgba(255, 255, 255, 0.3);
+    0 18px 52px rgba(45, 84, 155, 0.16),
+    0 0 86px rgba(186, 230, 253, 0.78),
+    0 0 130px rgba(147, 197, 253, 0.26),
+    inset 0 0 22px rgba(255, 255, 255, 0.68);
+  transform: scale(1);
+  transition: transform 80ms linear, box-shadow 80ms linear;
+  will-change: transform, border-radius, box-shadow;
+}
+
+.blobCharacterLayer {
+  position: absolute;
+  left: 5%;
+  top: 5%;
+  transform: translate(
+    calc(-50% + var(--avatar-offset-x)),
+    calc(-50% + var(--avatar-offset-y))
+  );
+  width: 370px;
+  height: 370px;
   display: grid;
   place-items: center;
-  transform: scale(1);
-  transition: transform 90ms linear, box-shadow 90ms linear;
+  pointer-events: none;
+  animation: charFloat 2.9s ease-in-out infinite;
 }
 
 .blobCharacter {
-  width: 118px;
-  height: 118px;
+  position: absolute;
+  width: 345px;
+  height: 345px;
   object-fit: contain;
-  animation: charFloat 2.7s ease-in-out infinite;
   user-select: none;
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 140ms ease;
+}
+
+.blobCharacterVideo {
+  position: absolute;
+  width: 345px;
+  height: 345px;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease;
 }
 
 @keyframes charFloat {
@@ -415,6 +532,34 @@
   max-width: 440px;
   width: 100%;
   justify-self: end;
+  background:
+    radial-gradient(460px 220px at 8% -8%, rgba(147, 197, 253, 0.26), transparent 60%),
+    radial-gradient(420px 200px at 98% 100%, rgba(165, 180, 252, 0.18), transparent 62%),
+    rgba(255, 255, 255, 0.84);
+}
+
+.chatCard::before {
+  content: '';
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  top: 14px;
+  right: 16px;
+  background: radial-gradient(circle at 35% 35%, rgba(186, 230, 253, 0.38), rgba(186, 230, 253, 0.04));
+  pointer-events: none;
+}
+
+.chatCard::after {
+  content: '';
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  border-radius: 30% 70% 65% 35% / 32% 39% 61% 68%;
+  bottom: 84px;
+  left: 10px;
+  background: linear-gradient(130deg, rgba(129, 140, 248, 0.2), rgba(56, 189, 248, 0.08));
+  pointer-events: none;
 }
 
 .chatPanel.isCollapsed {
@@ -428,6 +573,7 @@
   gap: 8px;
   padding: 14px 14px 10px;
   border-bottom: 1px solid rgba(29, 78, 216, 0.12);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.92), rgba(244, 250, 255, 0.72));
 }
 
 .chatHeaderLeft {
@@ -436,8 +582,9 @@
 
 .chatHeaderTitle {
   font-weight: 700;
-  font-size: 14px;
-  color: rgba(2, 6, 23, 0.84);
+  font-size: 15px;
+  color: rgba(15, 23, 42, 0.9);
+  letter-spacing: 0.01em;
 }
 
 .chatHeaderSubtitle {
@@ -446,7 +593,7 @@
   gap: 8px;
   align-items: center;
   font-size: 12px;
-  color: rgba(2, 6, 23, 0.6);
+  color: rgba(30, 41, 59, 0.58);
 }
 
 .presenceDot {
@@ -501,7 +648,7 @@
   background:
     radial-gradient(600px 260px at 30% 0%, rgba(56, 189, 248, 0.14), transparent 60%),
     radial-gradient(520px 240px at 70% 10%, rgba(251, 191, 36, 0.16), transparent 60%),
-    rgba(255, 255, 255, 0.38);
+    rgba(255, 255, 255, 0.54);
 }
 
 .chatPanel.isCollapsed .chatBody,
@@ -511,8 +658,11 @@
 
 .chatEmpty {
   margin: auto;
-  color: rgba(2, 6, 23, 0.45);
+  color: rgba(30, 41, 59, 0.52);
   font-size: 13px;
+  max-width: 240px;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .chatMsgRow {
@@ -535,29 +685,30 @@
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(2, 6, 23, 0.45);
+  color: rgba(30, 41, 59, 0.46);
   margin: 0 8px 4px;
 }
 
 .chatBubble {
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(29, 78, 216, 0.1);
-  background: rgba(255, 255, 255, 0.88);
-  color: rgba(2, 6, 23, 0.86);
+  padding: 10px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  color: rgba(15, 23, 42, 0.86);
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.4;
+  box-shadow: 0 7px 16px rgba(15, 23, 42, 0.06);
 }
 
 .chatMsgRow.isMine .chatBubble {
-  background: rgba(29, 78, 216, 0.16);
-  border-color: rgba(29, 78, 216, 0.22);
+  background: linear-gradient(145deg, rgba(219, 234, 254, 0.76), rgba(186, 230, 253, 0.62));
+  border-color: rgba(56, 189, 248, 0.28);
 }
 
 .chatBubble.isTranscript {
   font-style: italic;
-  background: rgba(251, 191, 36, 0.16);
-  border-color: rgba(251, 191, 36, 0.22);
+  background: rgba(165, 180, 252, 0.14);
+  border-color: rgba(129, 140, 248, 0.22);
 }
 
 .chatMsgRow.isMine .chatBubble.isTranscript {
@@ -575,7 +726,7 @@
 
 .chatInput {
   height: 31px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid rgba(29, 78, 216, 0.2);
   background: rgba(255, 255, 255, 0.85);
   padding: 0 12px;
@@ -593,7 +744,7 @@
 .sendButton {
   width: 35px;
   height: 31px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 0;
   cursor: pointer;
   background: linear-gradient(135deg, rgba(29, 78, 216, 0.26), rgba(251, 191, 36, 0.28));
@@ -665,13 +816,18 @@
 }
 
 .isMinimizedLayout .blob {
-  width: 198px;
-  height: 198px;
+  width: 336px;
+  height: 336px;
 }
 
 .isMinimizedLayout .blobCharacter {
-  width: 132px;
-  height: 132px;
+  width: 360px;
+  height: 360px;
+}
+
+.isMinimizedLayout .blobCharacterVideo {
+  width: 360px;
+  height: 360px;
 }
 
 .isMinimizedLayout .micButton {

@@ -1,0 +1,46 @@
+{
+  "whatsapp:+918983520121": {
+    "phone": "whatsapp:+918983520121",
+    "onboarding_step": "completed",
+    "profile": {
+      "full_name": "My name is vidit. I want to take  admission in havard",
+      "age": "20",
+      "target_countries": "USA"
+    },
+    "history": [
+      {
+        "role": "Student",
+        "text": "I want to study in havard but no money no visa only trump"
+      },
+      {
+        "role": "Aria",
+        "text": "Error: OPENROUTER_API_KEY is missing in your .env file."
+      },
+      {
+        "role": "Student",
+        "text": "Hii"
+      },
+      {
+        "role": "Aria",
+        "text": "Error: OPENROUTER_API_KEY is missing in your .env file."
+      },
+      {
+        "role": "Student",
+        "text": "Hii"
+      },
+      {
+        "role": "Aria",
+        "text": "Hello Vidit! If you want to study at Harvard, you'll need to explore financial aid options and scholarships. Additionally, you'll require a student visa to study in the USA. Let me know if you need more specific information!"
+      },
+      {
+        "role": "Student",
+        "text": "What's my name"
+      },
+      {
+        "role": "Aria",
+        "text": "Your name is Vidit. How can I assist you further?"
+      }
+    ],
+    "summaries": []
+  }
+}

@@ -152,6 +152,7 @@ type AgentPanelProps = {
 function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
   const agent = useAgent();
   const isAgentSpeaking = agent.state === 'speaking';
+  const micButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const statusText = useMemo(() => {
     const state = agent.state ?? 'unknown';
@@ -167,12 +168,18 @@ function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
     initialState: true,
   });
 
-  const onMicClick = (event: MouseEvent<HTMLButtonElement>) => {
-    if (micEnabled) {
-      event.preventDefault();
-      return;
-    }
+  useEffect(() => {
+    // Auto-recover mic if it drops during the live voice session.
+    if (micPending || micEnabled) return;
+    const timer = window.setTimeout(() => {
+      micButtonRef.current?.click();
+    }, 900);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [micEnabled, micPending]);
 
+  const onMicClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (buttonProps.onClick) {
       buttonProps.onClick(event);
     }
@@ -189,7 +196,7 @@ function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
 
         <div className="minimizedRow" aria-label="Voice controls">
           <div className="minimizedBox orbBox">
-            <VoiceBlob />
+            <VoiceBlob isAgentSpeaking={isAgentSpeaking} />
             <div className={`agentSignal ${isAgentSpeaking ? 'isActive' : ''}`} aria-live="polite">
               {isAgentSpeaking ? 'AI speaking' : 'Awaiting response'}
             </div>
@@ -198,6 +205,7 @@ function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
           <div className="minimizedBox micBox">
             <button
               {...buttonProps}
+              ref={micButtonRef}
               className={`micButton ${micEnabled ? 'isOn' : 'isOff'}`}
               onClick={onMicClick}
               disabled={Boolean(buttonProps.disabled) || micPending}
@@ -242,7 +250,7 @@ function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
                 ? 'Starting microphone...'
                 : micEnabled
                   ? 'Mic connected'
-                  : 'Tap mic to reconnect'}
+                  : 'Reconnecting microphone...'}
             </div>
           </div>
         </div>
@@ -252,18 +260,13 @@ function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
 
   return (
     <div className={`agentPanel ${isMinimized ? 'isMinimized' : ''}`}>
-      <VoiceBlob />
+      <VoiceBlob isAgentSpeaking={isAgentSpeaking} />
 
-      {!isMinimized ? (
-        <div className="agentStatus">
-          <div className="agentTitle">Fateh AI Counsellor</div>
-          <div className="agentSubtitle">{statusText}</div>
-        </div>
-      ) : null}
 
-      <div className="micRow" aria-label="Microphone controls">
+      <div className="micRow pt-10" aria-label="Microphone controls">
         <button
           {...buttonProps}
+          ref={micButtonRef}
           className={`micButton ${micEnabled ? 'isOn' : 'isOff'}`}
           onClick={onMicClick}
           disabled={Boolean(buttonProps.disabled) || micPending}
@@ -319,7 +322,7 @@ function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
           ? 'Starting microphone...'
           : micEnabled
             ? 'Mic connected'
-            : 'Tap mic to reconnect'}
+            : 'Reconnecting microphone...'}
       </div>
 
       {!isMinimized ? (
@@ -402,7 +405,7 @@ function ChatPanel({ onMinimize }: ChatPanelProps) {
     <div className={`chatPanel ${isOpen ? 'isOpen' : 'isCollapsed'}`}>
       <div className="chatHeader">
         <div className="chatHeaderLeft">
-          <div className="chatHeaderTitle">Fateh AI Counsellor</div>
+          <div className="chatHeaderTitle">Aria</div>
           <div className="chatHeaderSubtitle">
             <span
               className={`presenceDot ${isOnline ? 'isOnline' : 'isOffline'}`}
@@ -428,7 +431,7 @@ function ChatPanel({ onMinimize }: ChatPanelProps) {
         <>
           <div className="chatBody" role="log" aria-label="Messages">
             {mergedMessages.length === 0 ? (
-              <div className="chatEmpty">Start a conversation...</div>
+              <div className="chatEmpty">Aria is ready. Ask anything about your study-abroad journey.</div>
             ) : (
               mergedMessages.map((m) => (
                 <div
