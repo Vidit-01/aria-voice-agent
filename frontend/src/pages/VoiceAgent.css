@@ -12,19 +12,39 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(180deg, #eaf2ff 0%, #fff7d6 55%, #ffffff 100%);
+  background: #e8f1ff;
   z-index: 50;
 }
 
 .appBg {
   position: absolute;
-  inset: -120px;
+  inset: -80px;
   background:
-    radial-gradient(920px 520px at 18% 22%, rgba(56, 189, 248, 0.45), transparent 62%),
-    radial-gradient(760px 420px at 62% 16%, rgba(29, 78, 216, 0.28), transparent 64%),
-    radial-gradient(720px 420px at 74% 66%, rgba(251, 191, 36, 0.35), transparent 62%);
+    radial-gradient(920px 520px at 18% 22%, rgba(56, 189, 248, 0.2), transparent 62%),
+    radial-gradient(760px 420px at 62% 16%, rgba(29, 78, 216, 0.14), transparent 64%),
+    radial-gradient(720px 420px at 74% 66%, rgba(251, 191, 36, 0.16), transparent 62%);
   filter: blur(0px);
   pointer-events: none;
+  z-index: 0;
+}
+
+.cloudVideoBg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.cloudBgShade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.64) 70%, rgba(255, 255, 255, 0.78) 100%),
+    radial-gradient(780px 360px at 25% 20%, rgba(255, 255, 255, 0.22), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .vaTopBar {
@@ -80,11 +100,16 @@
   z-index: 1;
   flex: 1;
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: 1.75fr 0.82fr;
   gap: 18px;
   padding: 14px 26px 26px;
   align-items: stretch;
   overflow: hidden;
+}
+
+.isMinimizedGrid {
+  grid-template-columns: 1fr;
+  padding: 0;
 }
 
 @media (max-width: 980px) {
@@ -110,6 +135,15 @@
   place-items: center;
   padding: 22px;
   min-height: 520px;
+}
+
+.isBarePanel {
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 @media (max-width: 980px) {
@@ -141,6 +175,99 @@
   padding: 10px 6px 6px;
 }
 
+.agentPanel.isMinimized {
+  width: min(980px, 100%);
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  padding: 28px 24px;
+}
+
+.voiceBlobWrap {
+  display: grid;
+  place-items: center;
+}
+
+.blob {
+  width: 186px;
+  height: 186px;
+  border-radius: 50%;
+  background:
+    radial-gradient(120px 120px at 30% 28%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.35)),
+    linear-gradient(150deg, #dbeafe 0%, #c4b5fd 55%, #bfdbfe 100%);
+  box-shadow:
+    0 20px 45px rgba(37, 99, 235, 0.16),
+    0 0 28px rgba(125, 211, 252, 0.62),
+    inset 0 0 10px rgba(255, 255, 255, 0.3);
+  display: grid;
+  place-items: center;
+  transform: scale(1);
+  transition: transform 90ms linear, box-shadow 90ms linear;
+}
+
+.blobCharacter {
+  width: 118px;
+  height: 118px;
+  object-fit: contain;
+  animation: charFloat 2.7s ease-in-out infinite;
+  user-select: none;
+  pointer-events: none;
+}
+
+@keyframes charFloat {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.minimizedTopBar {
+  width: min(760px, 100%);
+  display: flex;
+  justify-content: flex-start;
+}
+
+.minimizedRow {
+  width: min(760px, 100%);
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 26px;
+}
+
+.minimizedBox {
+  min-width: 250px;
+  border-radius: 18px;
+  border: 1px solid rgba(29, 78, 216, 0.2);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 18px 44px rgba(2, 6, 23, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 18px;
+}
+
+.orbBox .agentSignal {
+  margin-top: 4px;
+}
+
+.micBox .micHint {
+  text-align: center;
+  margin-top: 4px;
+}
+
 .agentAvatar {
   width: 156px;
   height: 156px;
@@ -158,6 +285,29 @@
     radial-gradient(90px 90px at 40% 35%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.4)),
     radial-gradient(110px 110px at 55% 60%, rgba(2, 132, 199, 0.22), rgba(2, 132, 199, 0.05));
   border: 1px solid rgba(2, 6, 23, 0.08);
+  transform: scale(var(--orb-scale, 1));
+  transition:
+    transform 130ms linear,
+    box-shadow 130ms linear;
+  box-shadow:
+    0 0 0 calc(8px + 20px * var(--orb-glow-strength, 0.15)) rgba(56, 189, 248, 0.08),
+    0 0 0 calc(15px + 26px * var(--orb-glow-strength, 0.15)) rgba(29, 78, 216, 0.06);
+}
+
+.agentAvatarInner.isSpeaking {
+  animation: orbPulse 1.05s ease-in-out infinite;
+}
+
+@keyframes orbPulse {
+  0% {
+    filter: saturate(1);
+  }
+  50% {
+    filter: saturate(1.18);
+  }
+  100% {
+    filter: saturate(1);
+  }
 }
 
 .agentStatus {
@@ -228,8 +378,8 @@
 }
 
 .waveWrap {
-  width: 210px;
-  height: 46px;
+  width: 184px;
+  height: 42px;
   display: grid;
   place-items: center;
   border-radius: 999px;
@@ -238,12 +388,16 @@
   padding: 0 10px;
 }
 
-.wavePlaceholder {
-  width: 100%;
-  height: 14px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(2, 6, 23, 0.12), rgba(2, 6, 23, 0.04), rgba(2, 6, 23, 0.12));
-  opacity: 0.7;
+.agentSignal {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(2, 6, 23, 0.6);
+  letter-spacing: 0.02em;
+}
+
+.agentSignal.isActive {
+  color: rgba(29, 78, 216, 0.9);
+  text-shadow: 0 0 14px rgba(29, 78, 216, 0.25);
 }
 
 .micHint {
@@ -257,16 +411,27 @@
   grid-template-rows: auto 1fr auto;
 }
 
+.chatCard {
+  max-width: 440px;
+  width: 100%;
+  justify-self: end;
+}
+
 .chatPanel.isCollapsed {
   grid-template-rows: auto 1fr;
 }
 
 .chatHeader {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
   padding: 14px 14px 10px;
   border-bottom: 1px solid rgba(29, 78, 216, 0.12);
+}
+
+.chatHeaderLeft {
+  margin-right: auto;
 }
 
 .chatHeaderTitle {
@@ -315,8 +480,8 @@
 }
 
 .chatCloseButton {
-  min-width: 74px;
-  font-size: 12px;
+  min-width: 62px;
+  font-size: 11px;
   font-weight: 600;
   color: rgba(2, 6, 23, 0.74);
   background: linear-gradient(135deg, rgba(29, 78, 216, 0.12), rgba(251, 191, 36, 0.18));
@@ -403,13 +568,13 @@
 .chatComposer {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 9px 10px;
   border-top: 1px solid rgba(29, 78, 216, 0.12);
 }
 
 .chatInput {
-  height: 36px;
+  height: 31px;
   border-radius: 10px;
   border: 1px solid rgba(29, 78, 216, 0.2);
   background: rgba(255, 255, 255, 0.85);
@@ -426,8 +591,8 @@
 }
 
 .sendButton {
-  width: 40px;
-  height: 36px;
+  width: 35px;
+  height: 31px;
   border-radius: 10px;
   border: 0;
   cursor: pointer;
@@ -463,4 +628,65 @@
   font-size: 13px;
   line-height: 1.45;
   color: rgba(2, 6, 23, 0.62);
+}
+
+.panelControls {
+  margin-top: 2px;
+}
+
+.modeToggleButton {
+  border: 1px solid rgba(29, 78, 216, 0.16);
+  background: rgba(255, 255, 255, 0.8);
+  color: rgba(2, 6, 23, 0.74);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+
+.modeToggleButton:hover {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.isMinimizedLayout .leftCard {
+  min-height: 100%;
+  padding: 0;
+}
+
+.isMinimizedLayout .agentPanel .agentStatus,
+.isMinimizedLayout .agentPanel .panelControls {
+  display: none;
+}
+
+.isMinimizedLayout .agentAvatar {
+  width: 198px;
+  height: 198px;
+}
+
+.isMinimizedLayout .blob {
+  width: 198px;
+  height: 198px;
+}
+
+.isMinimizedLayout .blobCharacter {
+  width: 132px;
+  height: 132px;
+}
+
+.isMinimizedLayout .micButton {
+  width: 94px;
+  height: 94px;
+}
+
+@media (max-width: 860px) {
+  .minimizedRow {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .minimizedBox {
+    width: min(420px, 100%);
+    min-width: 0;
+  }
 }

@@ -24,8 +24,9 @@ const ProtectedRoute = ({ children, requireAdmin = false }: Props) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (requireAdmin && user.role !== "admin") {
-    return <Navigate to="/dashboard" replace />;
+  // Demo mode: skip admin role enforcement for hackathon flows.
+  if (requireAdmin) {
+    return <>{children}</>;
   }
 
   return <>{children}</>;

@@ -76,6 +76,7 @@ const AdminDashboard = () => {
       .then((r: { leads: LeadSummary[]; total: number }) => {
         setLeads(sortLeads(r.leads, sortBy));
         setTotal(r.total);
+        setError("");
       })
       .catch((err: { detail?: string }) =>
         setError(err?.detail ?? "Failed to load leads.")

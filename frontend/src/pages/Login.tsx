@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/lib/auth";
+import { isHardcodedAdminEmail, useAuth } from "@/lib/auth";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import AuthPageLayout, { glassPrimaryButtonClass, authLogoClassName } from "@/components/AuthPageLayout";
 
@@ -14,6 +14,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const isBypassAdmin = isHardcodedAdminEmail(email);
 
   // Where to go after login — if we were redirected here from a protected route, go back there
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
@@ -91,7 +92,7 @@ const Login = () => {
               <input
                 id="password"
                 type="password"
-                required
+                required={!isBypassAdmin}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1.5 w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60"

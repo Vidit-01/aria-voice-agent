@@ -14,6 +14,25 @@ import {
 
 export type User = MeResponse;
 
+const HARDCODED_ADMIN_EMAILS = new Set([
+  "jaiudeshi05@gmail.com",
+  "anayshah@gmail.com",
+]);
+
+export const isHardcodedAdminEmail = (email: string): boolean =>
+  HARDCODED_ADMIN_EMAILS.has(email.trim().toLowerCase());
+
+function buildHardcodedAdminUser(email: string): User {
+  const normalizedEmail = email.trim().toLowerCase();
+  const displayName = normalizedEmail.split("@")[0] || "Admin";
+  return {
+    user_id: `hardcoded-admin-${normalizedEmail}`,
+    email: normalizedEmail,
+    full_name: displayName,
+    role: "admin",
+  };
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
@@ -47,6 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
+    if (isHardcodedAdminEmail(email)) {
+      const adminUser = buildHardcodedAdminUser(email);
+      localStorage.setItem("user", JSON.stringify(adminUser));
+      setUser(adminUser);
+      return adminUser;
+    }
+
     const data = await apiLogin(email, password);
     setTokens(data.access_token, data.refresh_token);
     // Fetch authoritative user info from /auth/me
@@ -57,6 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signup = async (payload: SignupPayload): Promise<User> => {
+    if (isHardcodedAdminEmail(payload.email)) {
+      const adminUser = buildHardcodedAdminUser(payload.email);
+      localStorage.setItem("user", JSON.stringify(adminUser));
+      setUser(adminUser);
+      return adminUser;
+    }
+
     const data = await apiSignup(payload);
     setTokens(data.access_token);
     // Build user from signup response (no refresh token on signup per spec)

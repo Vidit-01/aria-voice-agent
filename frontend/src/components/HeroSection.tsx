@@ -3,11 +3,11 @@ import FloatingCard from "./FloatingCard";
 import AbstractBackdrop from "./AbstractBackdrop";
 
 const cards = [
-  { city: "Oxford", image: "/landing/oxford.png", gradient: "linear-gradient(135deg, #fb923c 0%, #ea580c 100%)", rotation: 0, floatClass: "animate-float-3" },
-  { city: "London", image: "/landing/london.png", gradient: "linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)", rotation: -6, floatClass: "animate-float-2" },
-  { city: "Cambridge", image: "/landing/cambridge.png", gradient: "linear-gradient(135deg, #34d399 0%, #10b981 100%)", rotation: -12, floatClass: "animate-float-1" },
-  { city: "Dublin", image: "/landing/dublin.png", gradient: "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)", rotation: 12, floatClass: "animate-float-5" },
-  { city: "Dubai", image: "/landing/dubai.png", gradient: "linear-gradient(135deg, #c084fc 0%, #9333ea 100%)", rotation: 6, floatClass: "animate-float-4" },
+  { city: "Oxford",    href: "https://en.wikipedia.org/wiki/Oxford",    image: "/landing/oxford.png",    gradient: "linear-gradient(135deg, #fb923c 0%, #ea580c 100%)", rotation: 0,   floatClass: "animate-float-3" },
+  { city: "London",    href: "https://en.wikipedia.org/wiki/London",    image: "/landing/london.png",    gradient: "linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)", rotation: -6,  floatClass: "animate-float-2" },
+  { city: "Cambridge", href: "https://en.wikipedia.org/wiki/Cambridge", image: "/landing/cambridge.png", gradient: "linear-gradient(135deg, #34d399 0%, #10b981 100%)", rotation: -12, floatClass: "animate-float-1" },
+  { city: "Dublin",    href: "https://en.wikipedia.org/wiki/Dublin",    image: "/landing/dublin.png",    gradient: "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)", rotation: 12,  floatClass: "animate-float-5" },
+  { city: "Dubai",     href: "https://en.wikipedia.org/wiki/Dubai",     image: "/landing/dubai.png",     gradient: "linear-gradient(135deg, #c084fc 0%, #9333ea 100%)", rotation: 6,   floatClass: "animate-float-4" },
 ];
 
 const HeroSection = () => {

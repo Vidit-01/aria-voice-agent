@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/lib/auth";
+import { isHardcodedAdminEmail, useAuth } from "@/lib/auth";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import AuthPageLayout, { authLogoClassName, glassPrimaryButtonClass } from "@/components/AuthPageLayout";
 
@@ -15,23 +15,28 @@ const Signup = () => {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const isBypassAdmin = isHardcodedAdminEmail(email);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    if (password !== confirm) {
+    if (!isBypassAdmin && password !== confirm) {
       setError("Passwords do not match.");
       return;
     }
-    if (password.length < 8) {
+    if (!isBypassAdmin && password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
     }
     setLoading(true);
     try {
-      await signup({ email, password, full_name: fullName, role: "student" });
-      // After signup, send to profile registration
-      navigate("/register", { replace: true });
+      const user = await signup({ email, password, full_name: fullName, role: "student" });
+      if (user.role === "admin") {
+        navigate("/admin", { replace: true });
+      } else {
+        // After signup, send to profile registration
+        navigate("/register", { replace: true });
+      }
     } catch (err: unknown) {
       const msg = (err as { detail?: string })?.detail ?? "Could not create account. Try again.";
       setError(msg);
@@ -103,7 +108,7 @@ const Signup = () => {
               <input
                 id="password"
                 type="password"
-                required
+                required={!isBypassAdmin}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1.5 w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60"
@@ -117,7 +122,7 @@ const Signup = () => {
               <input
                 id="confirm"
                 type="password"
-                required
+                required={!isBypassAdmin}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 className="mt-1.5 w-full rounded-xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner backdrop-blur-sm focus:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-200/60"

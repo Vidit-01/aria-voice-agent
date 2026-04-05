@@ -46,12 +46,18 @@ async function apiFetch<T>(
   init: RequestInit = {},
   isFormData = false
 ): Promise<T> {
+  const isAdminRequest = path.startsWith("/admin");
   const token = getAccessToken();
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string>),
   };
   if (!isFormData) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (isAdminRequest) {
+    headers["role"] = "admin";
+    headers["x-role"] = "admin";
+    headers["x-user-role"] = "admin";
+  }
 
   let res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
 

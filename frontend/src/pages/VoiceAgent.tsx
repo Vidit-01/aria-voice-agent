@@ -1,4 +1,5 @@
 import {
+  type MouseEvent,
   useEffect,
   useMemo,
   useRef,
@@ -11,7 +12,6 @@ import {
   useSession,
   SessionProvider,
   useAgent,
-  BarVisualizer,
   useChat,
   useLocalParticipant,
   useTranscriptions,
@@ -20,6 +20,7 @@ import {
 import { TokenSource, Track } from 'livekit-client';
 import '@livekit/components-styles';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import VoiceBlob from '@/components/VoiceBlob';
 import './VoiceAgent.css';
 
 const tokenSource = TokenSource.sandboxTokenServer('codeshashtra-tg6qxa');
@@ -46,6 +47,7 @@ type SummaryItem = {
 
 export default function VoiceAgent() {
   useDocumentTitle('Voice Session');
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const sessionOptions = useMemo(() => ({ agentName: 'my-agent' }), []);
   const session = useSession(tokenSource, sessionOptions);
@@ -69,30 +71,70 @@ export default function VoiceAgent() {
     };
   }, [startSession, endSession]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMinimized(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
   return (
     <SessionProvider session={session}>
-      <div data-lk-theme="default" className="appShell">
+      <div
+        data-lk-theme="default"
+        className={`appShell ${isMinimized ? 'isMinimizedLayout' : ''}`}
+      >
         <div className="appBg" aria-hidden="true" />
+        <video
+          ref={(el) => {
+            if (el) {
+              el.playbackRate = 0.7;
+            }
+          }}
+          className="cloudVideoBg"
+          autoPlay
+          muted
+          loop
+          playsInline
+          aria-hidden="true"
+        >
+          <source src="/landing/sky.mp4" type="video/mp4" />
+        </video>
+        <div className="cloudBgShade" aria-hidden="true" />
 
-        <header className="vaTopBar">
-          <Link to="/dashboard" className="vaBackButton">
-            ← Dashboard
-          </Link>
-          <div className="brandMark" aria-label="Fateh">
-            F
-          </div>
-        </header>
+        {!isMinimized ? (
+          <header className="vaTopBar">
+            <Link to="/dashboard" className="vaBackButton">
+              ← Dashboard
+            </Link>
+          </header>
+        ) : null}
 
-        <main className="mainGrid">
-          <section className="card leftCard" aria-label="Voice assistant">
-            <AgentPanel />
+        <main className={`mainGrid ${isMinimized ? 'isMinimizedGrid' : ''}`}>
+          <section
+            className={`card leftCard ${isMinimized ? 'isBarePanel' : ''}`}
+            aria-label="Voice assistant"
+          >
+            <AgentPanel
+              isMinimized={isMinimized}
+              onExpand={() => setIsMinimized(false)}
+              onMinimize={() => setIsMinimized(true)}
+            />
           </section>
 
-          <aside className="rightColumn" aria-label="Side panels">
-            <section className="card chatCard" aria-label="Chat">
-              <ChatPanel />
-            </section>
-          </aside>
+          {!isMinimized ? (
+            <aside className="rightColumn" aria-label="Side panels">
+              <section className="card chatCard" aria-label="Chat">
+                <ChatPanel onMinimize={() => setIsMinimized(true)} />
+              </section>
+            </aside>
+          ) : null}
         </main>
 
         <RoomAudioRenderer />
@@ -101,12 +143,21 @@ export default function VoiceAgent() {
   );
 }
 
-function AgentPanel() {
+type AgentPanelProps = {
+  isMinimized: boolean;
+  onExpand: () => void;
+  onMinimize: () => void;
+};
+
+function AgentPanel({ isMinimized, onExpand, onMinimize }: AgentPanelProps) {
   const agent = useAgent();
+  const isAgentSpeaking = agent.state === 'speaking';
+
   const statusText = useMemo(() => {
     const state = agent.state ?? 'unknown';
-    if (state === 'listening' || agent.canListen) return 'Listening...';
     if (state === 'speaking') return 'Speaking...';
+    if (state === 'thinking') return 'Thinking...';
+    if (state === 'listening' || agent.canListen) return 'Listening...';
     if (state === 'connecting') return 'Connecting...';
     return String(state).replaceAll('-', ' ').replace(/\b\w/g, (m) => m.toUpperCase());
   }, [agent.canListen, agent.state]);
@@ -116,23 +167,107 @@ function AgentPanel() {
     initialState: true,
   });
 
-  return (
-    <div className="agentPanel">
-      <div className="agentAvatar" aria-hidden="true">
-        <div className="agentAvatarInner" />
-      </div>
+  const onMicClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (micEnabled) {
+      event.preventDefault();
+      return;
+    }
 
-      <div className="agentStatus">
-        <div className="agentTitle">Fateh AI Counsellor</div>
-        <div className="agentSubtitle">{statusText}</div>
+    if (buttonProps.onClick) {
+      buttonProps.onClick(event);
+    }
+  };
+
+  if (isMinimized) {
+    return (
+      <div className="agentPanel isMinimized">
+        <div className="minimizedTopBar">
+          <button className="modeToggleButton" type="button" onClick={onExpand}>
+            Back to full layout
+          </button>
+        </div>
+
+        <div className="minimizedRow" aria-label="Voice controls">
+          <div className="minimizedBox orbBox">
+            <VoiceBlob />
+            <div className={`agentSignal ${isAgentSpeaking ? 'isActive' : ''}`} aria-live="polite">
+              {isAgentSpeaking ? 'AI speaking' : 'Awaiting response'}
+            </div>
+          </div>
+
+          <div className="minimizedBox micBox">
+            <button
+              {...buttonProps}
+              className={`micButton ${micEnabled ? 'isOn' : 'isOff'}`}
+              onClick={onMicClick}
+              disabled={Boolean(buttonProps.disabled) || micPending}
+              aria-label={micEnabled ? 'Microphone connected' : 'Reconnect microphone'}
+            >
+              <span className="micButtonRing" aria-hidden="true" />
+              <span className="micButtonIcon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none">
+                  <path
+                    d="M12 14.5a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5.5a3 3 0 0 0 3 3Z"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M19 11.5a7 7 0 0 1-14 0"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M12 18.5v3"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M8.5 21.5h7"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            </button>
+            <div className="micHint">
+              {micPending
+                ? 'Starting microphone...'
+                : micEnabled
+                  ? 'Mic connected'
+                  : 'Tap mic to reconnect'}
+            </div>
+          </div>
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className={`agentPanel ${isMinimized ? 'isMinimized' : ''}`}>
+      <VoiceBlob />
+
+      {!isMinimized ? (
+        <div className="agentStatus">
+          <div className="agentTitle">Fateh AI Counsellor</div>
+          <div className="agentSubtitle">{statusText}</div>
+        </div>
+      ) : null}
 
       <div className="micRow" aria-label="Microphone controls">
         <button
           {...buttonProps}
           className={`micButton ${micEnabled ? 'isOn' : 'isOff'}`}
+          onClick={onMicClick}
           disabled={Boolean(buttonProps.disabled) || micPending}
-          aria-label={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
+          aria-label={micEnabled ? 'Microphone connected' : 'Reconnect microphone'}
         >
           <span className="micButtonRing" aria-hidden="true" />
           <span className="micButtonIcon" aria-hidden="true">
@@ -169,27 +304,40 @@ function AgentPanel() {
           </span>
         </button>
 
-        <div className="waveWrap" aria-label="Voice activity">
-          {agent.canListen && agent.microphoneTrack ? (
-            <BarVisualizer
-              track={agent.microphoneTrack}
-              state={agent.state}
-              barCount={18}
-            />
-          ) : (
-            <div className="wavePlaceholder" aria-hidden="true" />
-          )}
+        <div className="waveWrap" aria-label="Voice activity status">
+          <div
+            className={`agentSignal ${isAgentSpeaking ? 'isActive' : ''}`}
+            aria-live="polite"
+          >
+            {isAgentSpeaking ? 'AI speaking' : 'Awaiting response'}
+          </div>
         </div>
       </div>
 
       <div className="micHint">
-        {micPending ? 'Starting microphone...' : micEnabled ? 'Speak now' : 'Mic is off'}
+        {micPending
+          ? 'Starting microphone...'
+          : micEnabled
+            ? 'Mic connected'
+            : 'Tap mic to reconnect'}
       </div>
+
+      {!isMinimized ? (
+        <div className="panelControls">
+          <button className="modeToggleButton" type="button" onClick={onMinimize}>
+            Minimize layout
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function ChatPanel() {
+type ChatPanelProps = {
+  onMinimize: () => void;
+};
+
+function ChatPanel({ onMinimize }: ChatPanelProps) {
   const agent = useAgent();
   const { localParticipant } = useLocalParticipant();
   const { chatMessages, send, isSending } = useChat();
@@ -270,6 +418,9 @@ function ChatPanel() {
           aria-label={isOpen ? 'Close chat' : 'Open chat'}
         >
           {isOpen ? 'Close' : 'Open'}
+        </button>
+        <button className="iconButton chatCloseButton" type="button" onClick={onMinimize}>
+          Minimize
         </button>
       </div>
 
