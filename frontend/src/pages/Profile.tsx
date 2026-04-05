@@ -1,202 +1,258 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useAuth } from "@/lib/auth";
 import {
-  LayoutDashboard,
+  getProfile,
+  getPreAnalysis,
+  getResumeUrl,
+  type ProfileResponse,
+  type AnalyzeResponse,
+} from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import AppSidebar from "@/components/AppSidebar";
+import {
   User,
   FileText,
-  Award,
-  File,
-  BookOpen,
-  Headphones,
-  Search,
-  Bell,
   Edit2,
   GraduationCap,
   BarChart,
   Lightbulb,
   CheckCircle2,
-  Users,
   Target,
   Wallet,
   Timer,
   Plane,
-  Link as LinkIcon,
   MapPin,
-  Linkedin,
-  Github,
-  Globe
 } from "lucide-react";
 
-// Helper components for the circular progress
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  "UK": "🇬🇧", "United Kingdom": "🇬🇧",
+  "Ireland": "🇮🇪",
+  "UAE": "🇦🇪",
+  "Germany": "🇩🇪",
+  "France": "🇫🇷",
+  "Netherlands": "🇳🇱",
+  "Canada": "🇨🇦",
+  "USA": "🇺🇸", "United States": "🇺🇸",
+  "Australia": "🇦🇺",
+  "Switzerland": "🇨🇭",
+  "Sweden": "🇸🇪",
+  "Denmark": "🇩🇰",
+  "New Zealand": "🇳🇿",
+  "Belgium": "🇧🇪",
+  "Italy": "🇮🇹",
+  "Spain": "🇪🇸",
+  "Portugal": "🇵🇹",
+  "Singapore": "🇸🇬",
+  "Japan": "🇯🇵",
+};
+
+function countryFlag(name: string) {
+  return COUNTRY_FLAGS[name] ?? "🌍";
+}
+
+function val(v: string | number | null | undefined, fallback = "—"): string {
+  if (v === null || v === undefined || v === "") return fallback;
+  return String(v);
+}
+
+function formatUsd(usd: number | null | undefined): string {
+  if (!usd) return "—";
+  return `$${(usd / 1000).toFixed(0)}K`;
+}
+
+function scoreBar(score: number | null | undefined, max: number): number {
+  if (!score) return 0;
+  return Math.min(100, Math.round((score / max) * 100));
+}
+
+// ── circular progress ────────────────────────────────────────────────────────
+
 const CircularProgress = ({ value }: { value: number }) => {
-  const radius = 24;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (value / 100) * circumference;
+  const SIZE   = 116;
+  const SW     = 9;                        // stroke width
+  const R      = (SIZE - SW) / 2;          // 53.5
+  const CIRC   = 2 * Math.PI * R;
+  const offset = CIRC - (value / 100) * CIRC;
+  const cx     = SIZE / 2;
 
   return (
-    <div className="relative flex h-28 w-28 items-center justify-center">
-      <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 64 64">
-        {/* Background Circle */}
-        <circle className="text-slate-200" strokeWidth="6" stroke="currentColor" fill="transparent" r={radius} cx="32" cy="32" />
-        {/* Progress Circle */}
-        <circle className="text-[#2B77D2]" strokeWidth="6" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" stroke="currentColor" fill="transparent" r={radius} cx="32" cy="32" />
+    <div style={{ position: "relative", width: SIZE, height: SIZE, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <svg
+        width={SIZE} height={SIZE}
+        style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}
+      >
+        <defs>
+          <linearGradient id="circGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stopColor="#3B82F6" />
+            <stop offset="100%" stopColor="#06B6D4" />
+          </linearGradient>
+        </defs>
+        {/* Track */}
+        <circle cx={cx} cy={cx} r={R} fill="none" stroke="#E2E8F0" strokeWidth={SW} />
+        {/* Arc */}
+        <circle
+          cx={cx} cy={cx} r={R}
+          fill="none"
+          stroke="url(#circGrad)"
+          strokeWidth={SW}
+          strokeLinecap="round"
+          strokeDasharray={CIRC}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.6s ease" }}
+        />
       </svg>
-      <div className="absolute flex flex-col items-center justify-center text-center">
-        <span className="text-3xl font-extrabold text-slate-900 leading-none">{value}%</span>
-        <span className="text-[0.70rem] font-bold text-slate-500 uppercase leading-[1.2] mt-1 tracking-widest">Complete</span>
+
+      {/* Centre text */}
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", lineHeight: 1 }}>
+        <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#0F172A", letterSpacing: "-0.03em" }}>
+          {value}%
+        </div>
+        <div style={{ fontSize: "0.6rem", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginTop: 4 }}>
+          Complete
+        </div>
       </div>
     </div>
   );
 };
 
-// Mock data to replicate the exact image details
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", active: false },
-  { icon: User, label: "Profile", href: "/profile", active: true },
-  { icon: FileText, label: "Applications", href: "#", active: false },
-  { icon: Award, label: "Test Prep", href: "#", active: false },
-  { icon: File, label: "Documents", href: "#", active: false },
-  { icon: BookOpen, label: "Resources", href: "#", active: false },
-];
+// ── skeleton ─────────────────────────────────────────────────────────────────
+
+const Skeleton = ({ className = "" }: { className?: string }) => (
+  <div className={`animate-pulse rounded-lg bg-slate-100 ${className}`} />
+);
+
+// ── main component ────────────────────────────────────────────────────────────
 
 const Profile = () => {
   useDocumentTitle("Student Profile");
+  const { user } = useAuth();
+
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.allSettled([
+      getProfile(user.user_id),
+      getPreAnalysis(user.user_id),
+    ]).then(([p, a]) => {
+      if (p.status === "fulfilled") setProfile(p.value);
+      if (a.status === "fulfilled") setAnalysis(a.value);
+      setLoading(false);
+    });
+  }, [user]);
+
+  // Fetch signed resume URL only once we know there is one
+  useEffect(() => {
+    if (!user || !profile?.resume_url) return;
+    getResumeUrl(user.user_id)
+      .then((r) => setResumeUrl(r.signed_url))
+      .catch(() => setResumeUrl(null));
+  }, [user, profile?.resume_url]);
+
+  const completeness = analysis?.pre_analysis.profile_completeness_score ?? 0;
+  const avatarSeed = encodeURIComponent(profile?.full_name ?? user?.full_name ?? "User");
+  const avatarUrl = `https://api.dicebear.com/8.x/avataaars/svg?seed=${avatarSeed}`;
+
+  const edu = profile?.current_education;
+  const ts = profile?.test_scores;
+  const budget = profile?.budget;
+  const timeline = profile?.timeline;
 
   return (
     <div className="flex min-h-screen bg-[#FDFBF7] font-sans">
-      {/* Sidebar Content */}
-      <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col bg-[#F0F5FD] md:flex">
-        <div className="flex items-center gap-3 px-8 py-8">
-          <Link to="/">
-            <img src="/landing/fateh_logo.png" alt="Fateh" className="h-9 w-auto" />
-          </Link>
-        </div>
-        
-        <nav className="mt-4 flex-1 px-4 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.label}
-                to={item.href}
-                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  item.active 
-                    ? "bg-[#DDEBFC] text-[#2B77D2] shadow-sm" 
-                    : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
-                }`}
-              >
-                <Icon className={`h-[1.15rem] w-[1.15rem] ${item.active ? "text-[#2B77D2]" : "text-slate-500"}`} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        
-        <div className="px-4 pb-8">
-          <Link
-            to="#"
-            className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/50 hover:text-slate-900"
-          >
-            <Headphones className="h-[1.15rem] w-[1.15rem] text-slate-500" />
-            Support
-          </Link>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="ml-0 flex-1 px-8 pb-12 pt-8 md:ml-64">
-        {/* Top Header */}
-        <header className="flex items-center justify-between mb-8">
-          <h1 className="text-[1.65rem] font-bold text-slate-900">Student Profile</h1>
-          
-          <div className="flex items-center gap-5">
-            <button className="text-slate-500 hover:text-slate-800 transition-colors">
-              <Bell className="h-5 w-5" />
-            </button>
-            <div className="relative w-64 hidden lg:block">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <Search className="h-4 w-4 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search"
-                className="block w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-[#2B77D2] focus:outline-none focus:ring-2 focus:ring-[#2B77D2]/20"
-              />
-            </div>
-            {/* Avatar block */}
-            <div className="flex h-10 w-10 overflow-hidden rounded-full border-2 border-white shadow-sm cursor-pointer ml-2 bg-amber-100">
-              <img src="https://api.dicebear.com/8.x/avataaars/svg?seed=Aryan" alt="User Profile" className="h-full w-full object-cover" />
-            </div>
-          </div>
-        </header>
-
-        {/* Dashboard Content Container */}
+      {/* Main Content — padded to sit below both fixed navbar and respect sidebar */}
+      <main className="ml-0 flex-1 px-8 pb-12 pt-24 md:ml-[260px]">
+        {/* Shared sidebar: fixed aside (desktop) + mobile overlay + mobile trigger */}
+        <AppSidebar />
         <div className="max-w-6xl mx-auto md:mx-0">
-          
-          {/* Main User Info Header Card */}
+
+          {/* User Info Header Card */}
           <div className="mb-6 flex items-center justify-between rounded-2xl border border-slate-100/50 bg-white px-8 py-6 shadow-sm">
             <div className="flex items-center gap-6">
               <div className="h-20 w-20 overflow-hidden rounded-full bg-amber-100 border-4 border-white shadow-md">
-                 <img src="https://api.dicebear.com/8.x/avataaars/svg?seed=Aryan" alt="Aryan Sharma" className="h-full w-full object-cover" />
+                <img src={avatarUrl} alt={profile?.full_name ?? "User"} className="h-full w-full object-cover" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Aryan Sharma</h2>
-                <p className="text-sm text-slate-600 mt-1">Aspiring International Student</p>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <span className="text-[0.8rem] leading-none">🇮🇳</span>
-                  <span className="text-[0.8rem] font-medium text-slate-500">Location: India</span>
+              {loading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-4 w-52" />
+                  <Skeleton className="h-3 w-28" />
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">{profile?.full_name ?? user?.full_name ?? "—"}</h2>
+                  <p className="text-sm text-slate-600 mt-1">Aspiring International Student</p>
+                  {profile?.target_countries && profile.target_countries.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-[0.8rem] font-medium text-slate-500">
+                        Targeting: {profile.target_countries.slice(0, 3).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <CircularProgress value={85} />
+            {loading ? <Skeleton className="h-28 w-28 rounded-full" /> : <CircularProgress value={completeness} />}
           </div>
 
-          {/* Flexible 2-Column Grid Layout */}
+          {/* 2-Column Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            
-            {/* ================= LEFT COLUMN ================= */}
+
+            {/* ── LEFT COLUMN ── */}
             <div className="flex flex-col gap-6">
-              
+
               {/* Personal Information */}
-              <div className="rounded-2xl border border-slate-100/50 bg-white p-6 shadow-sm relative group overflow-hidden">
+              <div className="rounded-2xl border border-slate-100/50 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
                     <User className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
                     <h3 className="font-bold text-slate-900">Personal Information</h3>
                   </div>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
+                  <Link to="/register" className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
                     <Edit2 className="h-3 w-3" /> Edit
-                  </button>
+                  </Link>
                 </div>
-                <div className="grid grid-cols-2 gap-y-5 gap-x-4">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Full Name</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">Aryan Sharma</p>
+                {loading ? (
+                  <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+                    {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Email Address</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900 break-all">aryan.s@fateh.edu</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Phone Number</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">+91 9876543210</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Nationality</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">Indian</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Date of Birth</p>
-                    <div className="flex items-baseline gap-1.5">
-                      <p className="text-[0.9rem] font-semibold text-slate-900">15 Aug 2002</p>
-                      <span className="text-xs font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md">(23 Yrs)</span>
+                ) : (
+                  <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Full Name</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{val(profile?.full_name)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Email Address</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900 break-all">{val(profile?.email ?? user?.email)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Phone Number</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{val(profile?.phone)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Age</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{profile?.age ? `${profile.age} yrs` : "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Preferred Language</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900 capitalize">{val(profile?.preferred_language)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Visa Rejection</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">
+                        {profile?.previous_visa_rejection === true ? "Yes" : profile?.previous_visa_rejection === false ? "No" : "—"}
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Preferred Language</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">English</p>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Target Preferences */}
@@ -206,48 +262,43 @@ const Profile = () => {
                     <Target className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
                     <h3 className="font-bold text-slate-900">Target Preferences</h3>
                   </div>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
+                  <Link to="/register" className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
                     <Edit2 className="h-3 w-3" /> Edit
-                  </button>
+                  </Link>
                 </div>
-                
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Target Countries</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex items-center gap-1 rounded-md bg-[#F0F5FD] border border-[#DDEBFC] px-2.5 py-1 font-semibold text-[#2B77D2] text-xs">
-                      🇬🇧 UK
-                    </span>
-                    <span className="flex items-center gap-1 rounded-md bg-[#F0F5FD] border border-[#DDEBFC] px-2.5 py-1 font-semibold text-[#2B77D2] text-xs">
-                      🇮🇪 Ireland
-                    </span>
-                    <span className="flex items-center gap-1 rounded-md bg-[#F0F5FD] border border-[#DDEBFC] px-2.5 py-1 font-semibold text-[#2B77D2] text-xs">
-                      🇦🇪 UAE
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-1">Target Course</p>
-                  <p className="text-[0.9rem] font-semibold text-slate-900">Masters in Data Science</p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500 mb-2">Target Universities</p>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center gap-1.5 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 shadow-sm">
-                      <span className="text-[0.75rem] font-medium text-slate-700">Imperial College London</span>
+                {loading ? (
+                  <div className="space-y-4"><Skeleton className="h-8" /><Skeleton className="h-6" /><Skeleton className="h-8" /></div>
+                ) : (
+                  <>
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Target Countries</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {profile?.target_countries?.length ? profile.target_countries.map((c) => (
+                          <span key={c} className="flex items-center gap-1 rounded-md bg-[#F0F5FD] border border-[#DDEBFC] px-2.5 py-1 font-semibold text-[#2B77D2] text-xs">
+                            {countryFlag(c)} {c}
+                          </span>
+                        )) : <span className="text-sm text-slate-400">—</span>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 shadow-sm">
-                      <span className="text-[0.75rem] font-medium text-slate-700">UCL</span>
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-1">Target Course</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{val(profile?.target_course)}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 shadow-sm">
-                      <span className="text-[0.75rem] font-medium text-slate-700">Trinity College Dublin</span>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-2">Target Universities</p>
+                      <div className="flex flex-wrap gap-2">
+                        {profile?.target_universities?.length ? profile.target_universities.map((u) => (
+                          <div key={u} className="flex items-center gap-1.5 rounded-md bg-slate-100 border border-slate-200 px-2 py-1 shadow-sm">
+                            <span className="text-[0.75rem] font-medium text-slate-700">{u}</span>
+                          </div>
+                        )) : <span className="text-sm text-slate-400">—</span>}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
 
-              {/* Application Timeline Smart Card */}
+              {/* Application Timeline */}
               <div className="rounded-2xl border border-slate-100/50 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
@@ -255,63 +306,39 @@ const Profile = () => {
                     <h3 className="font-bold text-slate-900">Application Timeline</h3>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-5">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1.5">Target Intake</p>
-                    <p className="text-sm font-semibold text-slate-900">Autumn / Fall 2024</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1.5">Months Left</p>
-                    <p className="text-sm font-bold text-[#2B77D2]">4 Months</p>
-                  </div>
-                </div>
-
-                <div className="mb-5">
-                  <div className="flex justify-between text-xs font-semibold text-slate-500 mb-2">
-                    <span>Preparation</span>
-                    <span>Deadline</span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden relative shadow-inner">
-                    <div className="h-full bg-gradient-to-r from-sky-400 to-[#2B77D2]" style={{ width: "65%" }}></div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg bg-[#FAF0A8]/30 px-3.5 py-3 mt-2 border border-[#FAF0A8]/50">
-                   <p className="flex items-start gap-2 text-xs font-medium text-amber-800 leading-snug">
-                      <Lightbulb className="h-4 w-4 shrink-0 text-amber-500 fill-amber-500" />
-                      "Applying early increases admission chances and secures better housing options."
-                   </p>
-                </div>
-              </div>
-
-              {/* Profile Strength */}
-              <div className="rounded-2xl border border-slate-100/50 bg-white p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-5">
-                  <Users className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
-                  <h3 className="font-bold text-slate-900">Profile Strength</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-y-5 gap-x-4">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">SOP Status</p>
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                      <p className="text-sm font-semibold text-slate-900">Completed</p>
+                {loading ? <Skeleton className="h-24" /> : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1.5">Target Intake</p>
+                        <p className="text-sm font-semibold text-slate-900">{val(timeline?.preferred_intake)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1.5">Months Left</p>
+                        <p className="text-sm font-bold text-[#2B77D2]">
+                          {timeline?.months_to_start != null ? `${timeline.months_to_start} Months` : "—"}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">LOR Count</p>
-                    <p className="text-sm font-semibold text-slate-900">2 Obtained</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Work Experience</p>
-                    <p className="text-sm font-semibold text-slate-900">1 Year <span className="text-xs font-normal text-slate-500 block">(SDE)</span></p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Projects</p>
-                    <p className="text-sm font-semibold text-slate-900">2 Completed</p>
-                  </div>
-                </div>
+                    {timeline?.months_to_start != null && (
+                      <div className="mb-5">
+                        <div className="flex justify-between text-xs font-semibold text-slate-500 mb-2">
+                          <span>Preparation</span><span>Deadline</span>
+                        </div>
+                        <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden relative shadow-inner">
+                          <div className="h-full bg-gradient-to-r from-sky-400 to-[#2B77D2]"
+                            style={{ width: `${Math.min(100, Math.max(5, 100 - (timeline.months_to_start / 18) * 100))}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    <div className="rounded-lg bg-[#FAF0A8]/30 px-3.5 py-3 mt-2 border border-[#FAF0A8]/50">
+                      <p className="flex items-start gap-2 text-xs font-medium text-amber-800 leading-snug">
+                        <Lightbulb className="h-4 w-4 shrink-0 text-amber-500 fill-amber-500" />
+                        "Applying early increases admission chances and secures better housing options."
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Documents */}
@@ -322,37 +349,31 @@ const Profile = () => {
                     <h3 className="font-bold text-slate-900">Documents</h3>
                   </div>
                 </div>
-                
-                <div className="space-y-4">
-                  {/* Item 1 */}
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">
-                          <FileText className="h-5 w-5" />
+                {loading ? <Skeleton className="h-20" /> : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${profile?.resume_url ? "bg-green-50" : "border border-dashed border-slate-300 bg-slate-50"}`}>
+                          <FileText className={`h-5 w-5 ${profile?.resume_url ? "text-green-500" : "text-slate-400"}`} />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">Resume Setup</p>
-                          <p className="text-xs text-green-600 font-medium">Uploaded • Aryan_Resume_v2.pdf</p>
+                          <p className="text-sm font-semibold text-slate-900">Resume</p>
+                          {profile?.resume_url ? (
+                            resumeUrl ? (
+                              <a href={resumeUrl} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-green-600 font-medium hover:underline">Uploaded · View Resume</a>
+                            ) : (
+                              <p className="text-xs text-green-600 font-medium">Uploaded</p>
+                            )
+                          ) : (
+                            <p className="text-xs font-medium text-amber-600">Not uploaded</p>
+                          )}
                         </div>
-                     </div>
-                     <button className="text-slate-400 hover:text-[#2B77D2]"><Edit2 className="h-4 w-4" /></button>
-                  </div>
-                  {/* Item 2 */}
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">
-                          <BookOpen className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">Statement of Purpose</p>
-                          <p className="text-xs text-green-600 font-medium">Uploaded • SOP_Draft_Final.pdf</p>
-                        </div>
-                     </div>
-                     <button className="text-slate-400 hover:text-[#2B77D2]"><Edit2 className="h-4 w-4" /></button>
-                  </div>
-                  {/* Item 3 */}
-                  <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-3">
+                      </div>
+                      <Link to="/dashboard" className="text-slate-400 hover:text-[#2B77D2]"><Edit2 className="h-4 w-4" /></Link>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
                         <div className="h-10 w-10 border border-dashed border-slate-300 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
                           <Plane className="h-5 w-5" />
                         </div>
@@ -360,15 +381,15 @@ const Profile = () => {
                           <p className="text-sm font-semibold text-slate-900">Transcripts</p>
                           <p className="text-xs font-medium text-amber-600">Pending Upload</p>
                         </div>
-                     </div>
-                     <button className="text-slate-400 hover:text-[#2B77D2]"><Edit2 className="h-4 w-4" /></button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
             </div>
 
-            {/* ================= RIGHT COLUMN ================= */}
+            {/* ── RIGHT COLUMN ── */}
             <div className="flex flex-col gap-6">
 
               {/* Academic Details */}
@@ -378,36 +399,38 @@ const Profile = () => {
                     <GraduationCap className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
                     <h3 className="font-bold text-slate-900">Academic Details</h3>
                   </div>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
+                  <Link to="/register" className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
                     <Edit2 className="h-3 w-3" /> Edit
-                  </button>
+                  </Link>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-5 gap-x-4">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Education Level</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">Bachelor's Degree</p>
+                {loading ? (
+                  <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+                    {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Field of Study</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">Computer Science</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Education Level</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900 capitalize">{val(edu?.level)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Field of Study</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{val(edu?.field)}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-slate-500 mb-1">Institution Name</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{val(edu?.institution)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">GPA / Percentage</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{edu?.gpa != null ? `${edu.gpa} GPA` : "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Graduation Year</p>
+                      <p className="text-[0.9rem] font-semibold text-slate-900">{val(edu?.graduation_year)}</p>
+                    </div>
                   </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-slate-500 mb-1">Institution Name</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">Delhi Technological University</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">GPA / Percentage</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">8.5 CGPA</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Graduation Year</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">2024</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Backlogs</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">None</p>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Test Scores */}
@@ -417,53 +440,75 @@ const Profile = () => {
                     <BarChart className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
                     <h3 className="font-bold text-slate-900">Test Scores</h3>
                   </div>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
+                  <Link to="/register" className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
                     <Edit2 className="h-3 w-3" /> Edit
-                  </button>
+                  </Link>
                 </div>
-                
-                <div className="space-y-5">
-                  <div>
-                     <div className="flex items-center justify-between mb-1.5">
-                       <p className="text-[0.8rem] font-semibold text-slate-700">IELTS Score</p>
-                       <p className="text-[0.8rem] font-bold text-slate-900">Band 7.5</p>
-                     </div>
-                     <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
-                       <div className="h-full bg-[#2B77D2]" style={{ width: "85%" }}></div>
-                     </div>
-                  </div>
-                  
-                  <div>
-                     <div className="flex items-center justify-between mb-1.5">
-                       <p className="text-[0.8rem] font-semibold text-slate-700">TOEFL</p>
-                       <p className="text-[0.8rem] font-medium text-slate-500 border border-slate-200 px-1.5 rounded-sm">Not taken</p>
-                     </div>
-                     <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
-                       <div className="h-full bg-slate-200" style={{ width: "0%" }}></div>
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-1">
+                {loading ? <div className="space-y-5"><Skeleton className="h-8" /><Skeleton className="h-8" /><Skeleton className="h-8" /></div> : (
+                  <div className="space-y-5">
+                    {/* IELTS */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-[0.8rem] font-semibold text-slate-700">GRE</p>
-                        <p className="text-[0.8rem] font-bold text-slate-900">315</p>
+                        <p className="text-[0.8rem] font-semibold text-slate-700">IELTS</p>
+                        {ts?.ielts != null
+                          ? <p className="text-[0.8rem] font-bold text-slate-900">Band {ts.ielts}</p>
+                          : <p className="text-[0.8rem] font-medium text-slate-500 border border-slate-200 px-1.5 rounded-sm">Not taken</p>}
                       </div>
                       <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
-                        <div className="h-full bg-sky-500" style={{ width: "65%" }}></div>
+                        <div className="h-full bg-[#2B77D2]" style={{ width: `${scoreBar(ts?.ielts, 9)}%` }} />
                       </div>
                     </div>
+                    {/* TOEFL */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-[0.8rem] font-semibold text-slate-700">GMAT</p>
-                        <p className="text-[0.8rem] font-medium text-slate-500 border border-slate-200 px-1.5 rounded-sm">Opt</p>
+                        <p className="text-[0.8rem] font-semibold text-slate-700">TOEFL</p>
+                        {ts?.toefl != null
+                          ? <p className="text-[0.8rem] font-bold text-slate-900">{ts.toefl}</p>
+                          : <p className="text-[0.8rem] font-medium text-slate-500 border border-slate-200 px-1.5 rounded-sm">Not taken</p>}
                       </div>
                       <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
-                        <div className="h-full bg-slate-200" style={{ width: "0%" }}></div>
+                        <div className="h-full bg-[#2B77D2]" style={{ width: `${scoreBar(ts?.toefl, 120)}%` }} />
                       </div>
                     </div>
+                    {/* GRE + GMAT side by side */}
+                    <div className="grid grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[0.8rem] font-semibold text-slate-700">GRE</p>
+                          {ts?.gre != null
+                            ? <p className="text-[0.8rem] font-bold text-slate-900">{ts.gre}</p>
+                            : <p className="text-[0.8rem] font-medium text-slate-500 border border-slate-200 px-1.5 rounded-sm">Opt</p>}
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                          <div className="h-full bg-sky-500" style={{ width: `${scoreBar(ts?.gre, 340)}%` }} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[0.8rem] font-semibold text-slate-700">GMAT</p>
+                          {ts?.gmat != null
+                            ? <p className="text-[0.8rem] font-bold text-slate-900">{ts.gmat}</p>
+                            : <p className="text-[0.8rem] font-medium text-slate-500 border border-slate-200 px-1.5 rounded-sm">Opt</p>}
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                          <div className="h-full bg-sky-500" style={{ width: `${scoreBar(ts?.gmat, 800)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Duolingo (only show if present) */}
+                    {ts?.duolingo != null && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[0.8rem] font-semibold text-slate-700">Duolingo</p>
+                          <p className="text-[0.8rem] font-bold text-slate-900">{ts.duolingo}</p>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden shadow-inner">
+                          <div className="h-full bg-emerald-500" style={{ width: `${scoreBar(ts.duolingo, 160)}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Budget & Funding */}
@@ -473,33 +518,46 @@ const Profile = () => {
                     <Wallet className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
                     <h3 className="font-bold text-slate-900">Budget & Funding</h3>
                   </div>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
+                  <Link to="/register" className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
                     <Edit2 className="h-3 w-3" /> Edit
-                  </button>
+                  </Link>
                 </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-2 gap-y-5 gap-x-4 mb-4">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Tuition Budget</p>
-                    <p className="text-sm font-bold text-slate-900">₹30L - ₹40L <span className="text-xs font-normal text-slate-500">per annum</span></p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Scholarship Applied</p>
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-700">
-                       <CheckCircle2 className="h-3 w-3" /> Yes
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-slate-500 mb-1">Funding Source</p>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">Self + Education Loan</p>
-                  </div>
-                </div>
-                <div className="rounded-lg bg-sky-50 px-3.5 py-3 mt-1 border border-sky-100">
-                   <p className="flex items-start gap-2 text-xs font-medium text-sky-800 leading-snug">
-                      <Lightbulb className="h-4 w-4 shrink-0 text-[#2B77D2]" />
-                      "Securing a scholarship significantly improves your long-term budget flexibility."
-                   </p>
-                </div>
+                {loading ? <Skeleton className="h-24" /> : (
+                  <>
+                    <div className="grid grid-cols-2 gap-y-5 gap-x-4 mb-4">
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Annual Tuition Budget</p>
+                        <p className="text-sm font-bold text-slate-900">{formatUsd(budget?.annual_tuition_usd)} <span className="text-xs font-normal text-slate-500">/ year</span></p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Scholarship Applied</p>
+                        {budget?.scholarship_applied ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-700">
+                            <CheckCircle2 className="h-3 w-3" /> Yes
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">No</span>
+                        )}
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-xs text-slate-500 mb-1">Funding Source</p>
+                        <p className="text-[0.9rem] font-semibold text-slate-900 capitalize">{val(budget?.funding_source)}</p>
+                      </div>
+                      {budget?.living_expenses_usd != null && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Living Expenses</p>
+                          <p className="text-sm font-semibold text-slate-900">{formatUsd(budget.living_expenses_usd)} <span className="text-xs font-normal text-slate-500">/ year</span></p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="rounded-lg bg-sky-50 px-3.5 py-3 mt-1 border border-sky-100">
+                      <p className="flex items-start gap-2 text-xs font-medium text-sky-800 leading-snug">
+                        <Lightbulb className="h-4 w-4 shrink-0 text-[#2B77D2]" />
+                        "Securing a scholarship significantly improves your long-term budget flexibility."
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Visa Status */}
@@ -508,41 +566,41 @@ const Profile = () => {
                   <Plane className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
                   <h3 className="font-bold text-slate-900">Visa Status</h3>
                 </div>
-                <div>
-                   <p className="text-xs text-slate-500 mb-2">Current Application Status</p>
-                   <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm border border-slate-200">
-                      Not Applied Yet
-                   </span>
-                </div>
+                {loading ? <Skeleton className="h-8 w-40" /> : (
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">Previous Visa Rejection</p>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm border ${
+                      profile?.previous_visa_rejection
+                        ? "bg-red-50 border-red-200 text-red-700"
+                        : "bg-slate-100 border-slate-200 text-slate-600"
+                    }`}>
+                      {profile?.previous_visa_rejection === true ? "Yes — Rejection on record" : profile?.previous_visa_rejection === false ? "No — Clean history" : "Not specified"}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* External Links */}
-              <div className="rounded-2xl border border-slate-100/50 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <LinkIcon className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
-                    <h3 className="font-bold text-slate-900">External Links</h3>
+              {/* AI Analysis */}
+              {(analysis || loading) && (
+                <div className="rounded-2xl border border-slate-100/50 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Lightbulb className="h-[1.125rem] w-[1.125rem] text-[#2B77D2]" />
+                    <h3 className="font-bold text-slate-900">AI Pre-Analysis</h3>
                   </div>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[#DDEBFC] bg-[#F0F5FD] px-3 py-1.5 text-xs font-semibold text-[#2B77D2] transition hover:bg-[#DDEBFC]">
-                    <Edit2 className="h-3 w-3" /> Edit
-                  </button>
+                  {loading ? <div className="space-y-2"><Skeleton className="h-4" /><Skeleton className="h-4 w-4/5" /><Skeleton className="h-4 w-3/5" /></div> : (
+                    analysis?.pre_analysis.initial_observations?.length ? (
+                      <ul className="space-y-1.5">
+                        {analysis.pre_analysis.initial_observations.map((o) => (
+                          <li key={o} className="flex items-start gap-2 text-sm text-slate-700">
+                            <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#2B77D2]" />
+                            {o}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <p className="text-sm text-slate-400">No analysis available yet.</p>
+                  )}
                 </div>
-                
-                <div className="space-y-3 mt-2">
-                  <a href="#" className="flex items-center gap-3 text-sm font-medium text-slate-700 hover:text-[#2B77D2] transition-colors p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100">
-                    <Linkedin className="h-4 w-4 text-blue-600" />
-                    linkedin.com/in/aryan-sharma
-                  </a>
-                  <a href="#" className="flex items-center gap-3 text-sm font-medium text-slate-700 hover:text-[#2B77D2] transition-colors p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100">
-                    <Github className="h-4 w-4 text-slate-800" />
-                    github.com/aryancodes
-                  </a>
-                  <a href="#" className="flex items-center gap-3 text-sm font-medium text-slate-700 hover:text-[#2B77D2] transition-colors p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100">
-                    <Globe className="h-4 w-4 text-slate-500" />
-                    aryansharma.dev
-                  </a>
-                </div>
-              </div>
+              )}
 
             </div>
           </div>

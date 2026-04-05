@@ -15,9 +15,12 @@ settings = get_settings()
 app = FastAPI(title='Study Abroad Backend', version='1.0.0')
 logger = logging.getLogger(__name__)
 
+# Allow any localhost port for local dev; also respect explicit origins from env.
+_explicit_origins = [o for o in settings.cors_origins if o != '*']
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=_explicit_origins,
+    allow_origin_regex=r'https?://(localhost|127\.0\.0\.1)(:\d+)?',
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],

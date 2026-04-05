@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import AuthSection from "@/components/AuthSection";
 import FatehEducationInfo from "@/components/FatehEducationInfo";
@@ -21,7 +20,6 @@ const Index = () => {
 
   return (
     <div className="relative">
-      <Navbar />
       <HeroSection />
       <AuthSection />
       <FatehEducationInfo />

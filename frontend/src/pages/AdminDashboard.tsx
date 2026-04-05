@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import {
   adminGetAnalytics,
   adminGetLeads,
   type AnalyticsResponse,
   type LeadSummary,
 } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 // @ts-expect-error — JSX components without type declarations
@@ -48,8 +46,6 @@ function sortLeads(leads: LeadSummary[], sortBy: string): LeadSummary[] {
 
 const AdminDashboard = () => {
   useDocumentTitle("Admin Dashboard");
-  const { logout } = useAuth();
-  const navigate = useNavigate();
 
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [leads, setLeads] = useState<LeadSummary[]>([]);
@@ -89,85 +85,15 @@ const AdminDashboard = () => {
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/", { replace: true });
-  };
-
   return (
     <div
       style={{
         minHeight: "100vh",
         background: "#fafafa",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        paddingTop: 80,
       }}
     >
-      {/* ── Header ── */}
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          background: "#fff",
-          borderBottom: "1px solid #e5e7eb",
-          padding: "0 24px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1400,
-            margin: "0 auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            height: 50,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Link to="/">
-              <img
-                src="/landing/fateh_logo.png"
-                alt="Fateh"
-                style={{ height: 26 }}
-              />
-            </Link>
-            <span
-              style={{
-                background: "#1e293b",
-                color: "#fff",
-                fontSize: 10,
-                fontWeight: 700,
-                padding: "2px 8px",
-                borderRadius: 4,
-                letterSpacing: "0.04em",
-              }}
-            >
-              ADMIN
-            </span>
-            <span
-              style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}
-            >
-              Dashboard
-            </span>
-          </div>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: "5px 14px",
-              border: "1px solid #e5e7eb",
-              borderRadius: 6,
-              fontSize: 13,
-              cursor: "pointer",
-              background: "#fff",
-              color: "#374151",
-            }}
-          >
-            Log out
-          </button>
-        </div>
-      </header>
-
       {/* ── Main ── */}
       <main
         style={{
