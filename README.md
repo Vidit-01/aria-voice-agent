@@ -119,6 +119,11 @@ uv run python src/agent.py dev
 6. **Admin Audit:** Access `/admin` to view lead scores and session transcripts.
 
 ---
+## 👥 Team LetUsCook.exe
 
-## 📝 License
-Internal Hackathon Project. Distributed under the MIT License.
+- [Anay Shah](https://github.com/Anayshah13)
+- [Jai Udeshi](https://github.com/jaiudeshi05)
+- [Pratham Tiwari](https://github.com/prathamakajordy)
+- [Vidit Gupta](https://github.com/Vidit-01)
+
+---
